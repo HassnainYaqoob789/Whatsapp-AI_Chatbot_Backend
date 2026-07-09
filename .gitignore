@@ -1,0 +1,47 @@
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build / output
+dist/
+build/
+*.zip
+
+# Temporary files
+*.tmp
+*.swp
+*.pid
+*.seed
+
+# Personal / notes
+notes.md
+*.pdf
+
+# Puppeteer / headless browser downloads
+*.local-chromium
+
+# Misc
+*.tsbuildinfo
