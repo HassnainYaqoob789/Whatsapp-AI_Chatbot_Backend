@@ -18,10 +18,10 @@ const { checkQuota, deductTokens } = require("../services/quotaService");
 const pdfParse = require("pdf-parse");
 const fs = require("fs");
 const { getClientByPhoneId, invalidateClientCache } = require("../utils/clientHelper");
-const { isDuplicateMessage, addMessageToBuffer, flushMessageBuffer, getBufferCount } = require("../services/redisService");
+const { isDuplicateMessage, addMessageToBuffer, flushMessageBuffer, getBufferCount } = require("../services/cacheService");
 
-// Deduplication is now handled by redisService.js
-// Buffer is now handled by redisService.js
+// Deduplication is now handled by cacheService.js
+// Buffer is now handled by cacheService.js
 
 // ─────────────────────────────────────────────
 // Sanitize a template variable value per Meta rules:

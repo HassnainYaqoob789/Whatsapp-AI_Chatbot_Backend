@@ -6,8 +6,6 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
-const RedisStore = require("rate-limit-redis").default; // .default is required for rate-limit-redis v3+
-const { redisClient } = require("./src/services/redisService");
 
 // ── Security guard: refuse to start without a real JWT_SECRET ──
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim() === '') {
@@ -47,15 +45,14 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Global Rate Limiter backed by Redis for PM2/Cluster consistency
+// Global Rate Limiter backed by standard memory store
+// Note: In PM2 cluster mode without Redis, each instance tracks limits independently.
+// For a 50-client SaaS on shared hosting, this is perfectly acceptable for basic DDOS protection.
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 1000, // limit each IP to 1000 requests per windowMs
     standardHeaders: true, 
     legacyHeaders: false, 
-    store: new RedisStore({
-        sendCommand: (...args) => redisClient.call(...args),
-    }),
     message: { success: false, message: 'Too many requests from this IP, please try again later.' }
 });
 
@@ -94,7 +91,6 @@ const http = require("http");
 const { Server } = require("socket.io");
 
 const server = http.createServer(app);
-const { createAdapter } = require("@socket.io/redis-adapter");
 
 const io = new Server(server, {
     cors: {
@@ -104,13 +100,10 @@ const io = new Server(server, {
     }
 });
 
-// Configure Redis Adapter for PM2 Cluster consistency
-const pubClient = redisClient.duplicate();
-const subClient = redisClient.duplicate();
-
-// Since we use ioredis, duplicate() creates connected clients automatically.
-io.adapter(createAdapter(pubClient, subClient));
-console.log("✅ Socket.io Redis Adapter Configured (Cluster-Safe Sockets)");
+// Using default in-memory Socket.io adapter.
+// Note: If using PM2 in cluster mode (instances > 1), sticky sessions are required at the reverse proxy (Nginx) level,
+// OR you must revert to instances: 1 in ecosystem.config.js for perfect WebSocket stability.
+console.log("✅ Socket.io Initialized (In-Memory Adapter)");
 
 // Pass io to routes/controllers if needed (using app.set)
 app.set("io", io);
