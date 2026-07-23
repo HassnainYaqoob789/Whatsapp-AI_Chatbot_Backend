@@ -3,6 +3,8 @@
 // so each call uses the correct client's credentials.
 
 const axios = require("axios");
+const FormData = require("form-data");
+const fs = require("fs");
 
 // --- Send a simple text message ---
 async function sendWhatsAppMessage(recipientPhone, messageText, token, phoneNumberId) {
@@ -161,7 +163,7 @@ async function sendWhatsAppTemplate(recipientPhone, templateName, languageCode =
             }
         };
 
-        if (components) {
+        if (components && components.length > 0) {
             data.template.components = components;
         }
 
@@ -179,11 +181,74 @@ async function sendWhatsAppTemplate(recipientPhone, templateName, languageCode =
     }
 }
 
+// --- Upload media to Meta ---
+async function uploadMedia(filePath, mimeType, token, phoneNumberId, originalname) {
+    try {
+        const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/media`;
+        const form = new FormData();
+        
+        // Meta API requires a valid filename with an extension for media uploads.
+        // Multer removes extensions by default, so we must explicitly provide the original filename.
+        if (originalname) {
+            form.append("file", fs.createReadStream(filePath), { filename: originalname, contentType: mimeType });
+        } else {
+            form.append("file", fs.createReadStream(filePath));
+        }
+        
+        form.append("type", mimeType);
+        form.append("messaging_product", "whatsapp");
+
+        const headers = {
+            "Authorization": `Bearer ${token}`,
+            ...form.getHeaders()
+        };
+
+        const response = await axios.post(url, form, { headers });
+        return response.data.id;
+    } catch (error) {
+        console.error("Error uploading media:", error.response ? error.response.data : error.message);
+        throw error;
+    }
+}
+
+// --- Send media message ---
+async function sendMediaMessage(recipientPhone, mediaId, mediaType, token, phoneNumberId, caption = "") {
+    try {
+        const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`;
+        
+        // mediaType can be 'image', 'document', 'audio', 'video'
+        const data = {
+            messaging_product: "whatsapp",
+            to: recipientPhone,
+            type: mediaType,
+            [mediaType]: { id: mediaId }
+        };
+        
+        if (caption && (mediaType === 'image' || mediaType === 'document' || mediaType === 'video')) {
+            data[mediaType].caption = caption;
+        }
+
+        const headers = {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+        };
+
+        const response = await axios.post(url, data, { headers });
+        console.log(`Media ${mediaId} sent to ${recipientPhone}`);
+        return response.data;
+    } catch (error) {
+        console.error("Error sending media message:", error.response ? error.response.data : error.message);
+        throw error;
+    }
+}
+
 module.exports = {
     sendWhatsAppMessage,
     sendReaction,
     sendTypingIndicator,
     sendInteractiveButtons,
     getWhatsAppAnalytics,
-    sendWhatsAppTemplate
+    sendWhatsAppTemplate,
+    uploadMedia,
+    sendMediaMessage
 };

@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key_123';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const authMiddleware = async (req, res, next) => {
     try {
@@ -11,17 +11,24 @@ const authMiddleware = async (req, res, next) => {
         }
 
         const token = authHeader.replace('Bearer ', '');
-        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        try {
+            const decoded = jwt.verify(token, JWT_SECRET);
+            const user = await User.findById(decoded.id).select('-password');
+            
+            if (!user) {
+                return res.status(401).json({ success: false, message: 'Invalid token: User not found.' });
+            }
 
-        const user = await User.findById(decoded.id).select('-password');
-        if (!user) {
-            return res.status(401).json({ success: false, message: 'Invalid token: User not found.' });
+            req.user = user;
+            next();
+        } catch (jwtError) {
+            console.error("JWT Verify Error:", jwtError.message, "Token received:", token);
+            return res.status(401).json({ success: false, message: 'Authentication failed. Invalid or expired token.' });
         }
-
-        req.user = user;
-        next();
     } catch (error) {
-        return res.status(401).json({ success: false, message: 'Authentication failed. Invalid or expired token.' });
+        console.error("Auth Middleware Outer Error:", error);
+        return res.status(500).json({ success: false, message: 'Server error in auth middleware.' });
     }
 };
 

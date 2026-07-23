@@ -1,53 +1,61 @@
 const nodemailer = require('nodemailer');
 
 /**
- * Sends an email notification.
- * Uses SMTP credentials from environment variables.
+ * Sends a lead notification email using the CLIENT's own SMTP credentials.
  *
- * @param {Object} params - Email parameters
- * @param {string} params.to - Recipient email address
- * @param {string} params.subject - Email subject
- * @param {string} params.text - Plain text content (optional)
- * @param {string} params.html - HTML content (optional)
+ * ── Design decision ──
+ * There is NO global .env fallback.
+ * Every business tenant must configure their own SMTP in Settings.
+ * If SMTP is not configured → email is silently skipped (returns false).
+ * The chatbot controller logs a friendly reminder so the admin can see it
+ * in server logs or we can surface it in the UI later.
+ *
+ * @param {Object}  params
+ * @param {string}  params.to           - Recipient email address
+ * @param {string}  params.subject      - Email subject
+ * @param {string}  [params.text]       - Plain text fallback (optional)
+ * @param {string}  [params.html]       - HTML body (optional)
+ * @param {Object}  params.clientSmtp   - REQUIRED: per-tenant SMTP config
+ * @param {string}  params.clientSmtp.host
+ * @param {number}  [params.clientSmtp.port]      - default 465
+ * @param {string}  params.clientSmtp.user
+ * @param {string}  params.clientSmtp.password
+ * @param {string}  [params.clientSmtp.from]      - defaults to user
+ * @param {string}  [params.businessName]         - used in log messages
+ *
+ * @returns {Promise<boolean>} true if sent, false if skipped
  */
-const sendEmail = async ({ to, subject, text, html }) => {
-  const host = process.env.SMTP_HOST;
-  const port = process.env.SMTP_PORT || 465;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASSWORD;
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+const sendEmail = async ({ to, subject, text, html, clientSmtp, businessName }) => {
 
-  if (!host || !user) {
-    console.error('SMTP Configuration is missing. Please set SMTP_HOST and SMTP_USER in .env file.');
-    return;
-  }
+    const host = clientSmtp?.host?.trim();
+    const user = clientSmtp?.user?.trim();
+    const pass = clientSmtp?.password?.trim();
+    const port = clientSmtp?.port || 465;
+    const from = clientSmtp?.from?.trim() || user;
 
-  const secure = (Number(port) === 465);
+    // ── Guard: no client SMTP configured → skip + remind ──
+    if (!host || !user || !pass) {
+        console.warn(
+            `[${businessName || 'Client'}] ⚠️  Lead email NOT sent — SMTP not configured.` +
+            ` Go to Settings → Email Notification SMTP and fill in your credentials.`
+        );
+        return false;
+    }
 
-  const transporter = nodemailer.createTransport({
-    host: host,
-    port: Number(port),
-    secure: secure,
-    auth: {
-      user: user,
-      pass: pass,
-    },
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
+    const secure = (Number(port) === 465);
 
-  const mailOptions = {
-    from: from,
-    to: to,
-    subject: subject,
-    text: text,
-    html: html,
-  };
+    const transporter = nodemailer.createTransport({
+        host,
+        port: Number(port),
+        secure,
+        auth: { user, pass },
+        tls: { rejectUnauthorized: false },
+    });
 
-  const info = await transporter.sendMail(mailOptions);
-  console.log(`Email successfully sent to ${to}. MessageId: ${info.messageId}`);
-  return info;
+    const info = await transporter.sendMail({ from, to, subject, text, html });
+
+    console.log(`[${businessName || 'Client'}] ✅ Lead email sent to ${to}. MessageId: ${info.messageId}`);
+    return true;
 };
 
 module.exports = sendEmail;

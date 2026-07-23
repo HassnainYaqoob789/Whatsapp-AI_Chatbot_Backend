@@ -3,13 +3,14 @@ const User = require('../models/User');
 
 const seedSuperAdmin = async () => {
     try {
-        const superAdminEmail = 'superadmin@company.com';
+        const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'superadmin@company.com';
         const existingSuperAdmin = await User.findOne({ email: superAdminEmail });
 
         if (!existingSuperAdmin) {
             console.log('Seeding default Super Admin account...');
             const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash('superadmin123', salt);
+            const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'WABEX_SUPER_SECRET_123!';
+            const hashedPassword = await bcrypt.hash(superAdminPassword, salt);
 
             await User.create({
                 email: superAdminEmail,
@@ -17,7 +18,7 @@ const seedSuperAdmin = async () => {
                 role: 'SUPER_ADMIN',
                 clientId: null
             });
-            console.log('✅ Default Super Admin created (Email: superadmin@company.com, Pass: superadmin123)');
+            console.log(`✅ Default Super Admin created (Email: ${superAdminEmail}, Pass: [HIDDEN])`);
         }
     } catch (error) {
         console.error('Failed to seed Super Admin:', error);
