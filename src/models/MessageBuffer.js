@@ -4,25 +4,17 @@ const messageBufferSchema = new mongoose.Schema({
   clientId: {
     type: String,
     required: true,
-    index: true
+    unique: true // Exactly one document per client/phone combo
   },
-  role: {
-    type: String,
-    required: true,
-    default: "user"
-  },
-  content: {
-    type: String,
-    required: true
-  },
-  timestamp: {
-    type: Number,
-    required: true
-  },
-  createdAt: {
+  messages: [{
+    role: { type: String, required: true },
+    content: { type: String, required: true },
+    timestamp: { type: Number, required: true }
+  }],
+  updatedAt: {
     type: Date,
     default: Date.now,
-    expires: 180 // Auto-delete after 180 seconds to prevent DB bloat if flush fails
+    expires: 180 // Auto-delete doc after 3 minutes of inactivity
   }
 });
 

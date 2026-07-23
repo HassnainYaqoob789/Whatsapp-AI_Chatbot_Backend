@@ -31,12 +31,14 @@ async function isDuplicateMessage(messageId) {
  */
 async function addMessageToBuffer(clientId, message, role = "user") {
     try {
-        await MessageBuffer.create({
-            clientId,
-            role,
-            content: message,
-            timestamp: Date.now()
-        });
+        await MessageBuffer.findOneAndUpdate(
+            { clientId },
+            { 
+                $push: { messages: { role, content: message, timestamp: Date.now() } },
+                $set: { updatedAt: Date.now() }
+            },
+            { upsert: true }
+        );
     } catch (error) {
         console.error(`[Buffer] Error adding message to MongoDB buffer:`, error);
     }
@@ -47,16 +49,19 @@ async function addMessageToBuffer(clientId, message, role = "user") {
  */
 async function flushMessageBuffer(clientId) {
     try {
-        // Find all messages sorted by timestamp
-        const messages = await MessageBuffer.find({ clientId }).sort({ timestamp: 1 }).lean();
+        // ATOMIC OPERATION: Get the document and empty its messages array simultaneously.
+        // findOneAndUpdate returns the document AS IT WAS BEFORE the update by default.
+        const oldDoc = await MessageBuffer.findOneAndUpdate(
+            { clientId },
+            { $set: { messages: [], updatedAt: Date.now() } }
+        ).lean();
         
-        if (messages && messages.length > 0) {
-            // Delete the messages we just fetched
-            const messageIds = messages.map(m => m._id);
-            await MessageBuffer.deleteMany({ _id: { $in: messageIds } });
+        if (oldDoc && oldDoc.messages && oldDoc.messages.length > 0) {
+            // Sort by timestamp to ensure correct chronological order
+            const sortedMessages = oldDoc.messages.sort((a, b) => a.timestamp - b.timestamp);
             
             // Format to match old Redis structure exactly
-            return messages.map(msg => ({
+            return sortedMessages.map(msg => ({
                 role: msg.role,
                 content: msg.content,
                 timestamp: msg.timestamp
@@ -75,7 +80,8 @@ async function flushMessageBuffer(clientId) {
  */
 async function getBufferCount(clientId) {
     try {
-        return await MessageBuffer.countDocuments({ clientId });
+        const doc = await MessageBuffer.findOne({ clientId }).lean();
+        return doc && doc.messages ? doc.messages.length : 0;
     } catch (error) {
         console.error(`[Buffer] Error counting message buffer from MongoDB:`, error);
         return 0;
