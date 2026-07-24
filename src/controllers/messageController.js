@@ -2,6 +2,7 @@ const ChatHistory = require("../models/ChatHistory");
 const Client = require("../models/Client");
 const { sendWhatsAppMessage, uploadMedia, sendMediaMessage } = require("../services/whatsappService");
 const fs = require("fs");
+const mongoose = require('mongoose');
 
 const getAllChats = async (req, res) => {
     try {
@@ -24,7 +25,7 @@ const getChatByPhone = async (req, res) => {
 
         // Total messages count for pagination metadata
         const chatStats = await ChatHistory.aggregate([
-            { $match: { phoneNumber: phone, clientId: new require('mongoose').Types.ObjectId(clientId) } },
+            { $match: { phoneNumber: phone, clientId: new mongoose.Types.ObjectId(clientId) } },
             { $project: { totalMessages: { $size: "$messages" } } }
         ]);
 
