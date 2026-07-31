@@ -70,6 +70,23 @@ const verifyWebhook = async (req, res) => {
 // 2. Handle Incoming Messages (WhatsApp → Server)
 // ─────────────────────────────────────────────
 const handleIncomingMessage = async (req, res) => {
+    // ── Webhook Security: Verify X-Hub-Signature-256 ──
+    const signature = req.headers['x-hub-signature-256'];
+    const appSecret = process.env.META_APP_SECRET;
+    
+    if (appSecret && signature && req.rawBody) {
+        const crypto = require('crypto');
+        const hmac = crypto.createHmac('sha256', appSecret);
+        const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
+        
+        if (!crypto.timingSafeEqual(Buffer.from(digest, 'utf8'), Buffer.from(signature, 'utf8'))) {
+            console.error('❌ Webhook Signature Verification Failed! Potential Attack.');
+            return res.sendStatus(403);
+        }
+    } else if (appSecret && !signature) {
+        console.warn('⚠️ Webhook received without signature.');
+    }
+
     res.sendStatus(200);
 
     try {

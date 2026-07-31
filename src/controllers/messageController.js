@@ -98,6 +98,10 @@ const sendManualMessage = async (req, res) => {
         const client = await Client.findById(clientId);
         if (!client) return res.status(404).json({ success: false, message: "Client not found" });
 
+        if (!client.metaConnected || !client.whatsappToken || !client.phoneNumberId) {
+            return res.status(400).json({ success: false, message: "Please connect your WhatsApp account first via the Settings page." });
+        }
+
         const result = await sendWhatsAppMessage(to, message, client.whatsappToken, client.phoneNumberId);
         
         if (result && result.messages) {
@@ -131,6 +135,11 @@ const sendManualMedia = async (req, res) => {
 
         const client = await Client.findById(clientId);
         if (!client) return res.status(404).json({ success: false, message: "Client not found" });
+
+        if (!client.metaConnected || !client.whatsappToken || !client.phoneNumberId) {
+            fs.unlinkSync(file.path);
+            return res.status(400).json({ success: false, message: "Please connect your WhatsApp account first via the Settings page." });
+        }
 
         const mediaId = await uploadMedia(file.path, file.mimetype, client.whatsappToken, client.phoneNumberId);
         const msgType = file.mimetype.startsWith('image') ? 'image' : 'document';

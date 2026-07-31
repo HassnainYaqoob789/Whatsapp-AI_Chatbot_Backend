@@ -8,17 +8,17 @@ const clientSchema = new mongoose.Schema({
   },
   phoneNumberId: {
     type: String,
-    required: true,
-    unique: true,
+    default: '',
     index: true,
+    sparse: true,
   },
   whatsappToken: {
     type: String,
-    required: true,
+    default: '',
   },
   wabaId: {
     type: String,
-    required: true,
+    default: '',
   },
   verifyToken: {
     type: String,
@@ -53,6 +53,13 @@ const clientSchema = new mongoose.Schema({
     type: String,
     enum: ['PLUGIN', 'DIRECT'],
     default: 'DIRECT',
+  },
+  metaConnected: {
+    type: Boolean,
+    default: false,
+  },
+  metaConnectedAt: {
+    type: Date,
   },
   country: {
     type: String,

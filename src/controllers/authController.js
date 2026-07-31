@@ -118,6 +118,9 @@ const getMe = async (req, res) => {
 };
 
 // Public endpoint for WordPress onboarding
+// NOTE: In the new Embedded Signup flow, Meta fields (phoneNumberId, wabaId, permanentToken)
+// are NOT provided during registration. The client connects Meta later via "Connect with Meta" button.
+// However, we still accept them for backward compatibility (if a client has them from legacy setup).
 const wpOnboard = async (req, res) => {
     try {
         const { 
@@ -135,8 +138,9 @@ const wpOnboard = async (req, res) => {
             useWabexQuota
         } = req.body;
 
-        if (!businessName || !whatsappPhoneNumberId || !wabaId || !permanentToken || !adminEmail || !adminPassword) {
-            return res.status(400).json({ success: false, message: 'Please provide all required fields' });
+        // Only businessName, adminEmail, adminPassword are truly required now
+        if (!businessName || !adminEmail || !adminPassword) {
+            return res.status(400).json({ success: false, message: 'Please provide Business Name, Email, and Password.' });
         }
 
         // Check if user email already exists
@@ -146,46 +150,52 @@ const wpOnboard = async (req, res) => {
         let user;
 
         if (userExists) {
-            // Reconnection / Upsert Flow
+            // Reconnection / Upsert Flow — update existing client
             client = await Client.findById(userExists.clientId);
-            if (!client || client.phoneNumberId !== whatsappPhoneNumberId) {
-                return res.status(400).json({ success: false, message: 'Admin email already exists but is associated with a different WhatsApp Phone Number. Please use a different email or correct the Phone Number ID.' });
+            if (!client) {
+                return res.status(400).json({ success: false, message: 'Your account exists but the associated business was deleted. Please contact support.' });
             }
 
             // Update existing client with new details from the form
             client.businessName = businessName;
-            client.whatsappToken = permanentToken;
-            client.wabaId = wabaId;
-            client.verifyToken = webhookVerifyToken || client.verifyToken;
-            client.systemPrompt = systemPrompt || client.systemPrompt;
-            client.leadNotificationEmail = leadNotificationEmail || client.leadNotificationEmail;
+            if (whatsappPhoneNumberId) client.phoneNumberId = whatsappPhoneNumberId;
+            if (permanentToken) client.whatsappToken = permanentToken;
+            if (wabaId) client.wabaId = wabaId;
+            if (webhookVerifyToken) client.verifyToken = webhookVerifyToken;
+            if (systemPrompt) client.systemPrompt = systemPrompt;
+            if (leadNotificationEmail) client.leadNotificationEmail = leadNotificationEmail;
             client.aiModel = aiModel || client.aiModel;
-            client.aiApiKey = aiApiKey || client.aiApiKey;
+            if (aiApiKey) client.aiApiKey = aiApiKey;
             client.useWabexQuota = useWabexQuota !== false;
             await client.save();
             user = userExists;
 
         } else {
             // New Registration Flow
-            const phoneExists = await Client.findOne({ phoneNumberId: whatsappPhoneNumberId });
-            if (phoneExists) {
-                return res.status(409).json({ success: false, message: 'This WhatsApp Phone Number ID is already registered to another email. Each WhatsApp number can only be connected to one account.' });
+            // If Meta fields are provided (legacy), check for duplicate phone
+            if (whatsappPhoneNumberId) {
+                const phoneExists = await Client.findOne({ phoneNumberId: whatsappPhoneNumberId });
+                if (phoneExists) {
+                    return res.status(409).json({ success: false, message: 'This WhatsApp Phone Number ID is already registered to another email. Each WhatsApp number can only be connected to one account.' });
+                }
             }
 
-            // 1. Create the Client
+            // 1. Create the Client (Meta fields are optional — will be filled via Embedded Signup later)
             client = await Client.create({
                 businessName,
-                phoneNumberId: whatsappPhoneNumberId,
-                whatsappToken: permanentToken,
-                wabaId,
+                phoneNumberId: whatsappPhoneNumberId || '',
+                whatsappToken: permanentToken || '',
+                wabaId: wabaId || '',
                 verifyToken: webhookVerifyToken || 'WABEX_SECRET_123',
-                systemPrompt: systemPrompt || `You are an AI assistant for ${businessName}.`,
+                systemPrompt: systemPrompt || `You are an AI assistant for ${businessName}. You help customers with their queries politely and professionally.`,
                 leadNotificationEmail: leadNotificationEmail || adminEmail,
                 isActive: true, 
                 aiModel: aiModel || 'gpt-4o-mini',
                 aiApiKey: aiApiKey || '',
                 useWabexQuota: useWabexQuota !== false,
-                origin: 'PLUGIN'
+                origin: 'PLUGIN',
+                metaConnected: !!(whatsappPhoneNumberId && permanentToken && wabaId),
+                metaConnectedAt: (whatsappPhoneNumberId && permanentToken && wabaId) ? new Date() : undefined
             });
 
             // 2. Create the User (Client Admin)
@@ -211,8 +221,8 @@ const wpOnboard = async (req, res) => {
                 _id: client._id,
                 businessName: client.businessName,
                 phoneNumberId: client.phoneNumberId,
-                wabaId: client.wabaId
-                // Sensitive fields like whatsappToken are omitted
+                wabaId: client.wabaId,
+                metaConnected: client.metaConnected
             },
             user: {
                 id: user._id,
@@ -228,25 +238,29 @@ const wpOnboard = async (req, res) => {
 };
 
 // Public endpoint for WordPress passwordless login (re-linking)
+// NOTE: whatsappPhoneNumberId is now optional since new clients may not have connected Meta yet.
 const wpLoginEmail = async (req, res) => {
     try {
-        const { email, whatsappPhoneNumberId } = req.body;
-        if (!email || !whatsappPhoneNumberId) {
-            return res.status(400).json({ success: false, message: 'Please provide email and WhatsApp Phone Number ID to reconnect.' });
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, message: 'Please provide your registered email to reconnect.' });
         }
 
         // Find user by email
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(404).json({ success: false, message: 'No account found with this email. Please register.' });
+            return res.status(404).json({ success: false, message: 'No account found with this email. Please register first.' });
+        }
+
+        // Verify user is a CLIENT_ADMIN (not a Super Admin trying to use plugin login)
+        if (user.role !== 'CLIENT_ADMIN') {
+            return res.status(403).json({ success: false, message: 'This login is only for client accounts.' });
         }
 
         // Find associated client
         const client = await Client.findById(user.clientId);
-        
-        // Security check: Match the phone number ID to verify ownership
-        if (client.phoneNumberId !== whatsappPhoneNumberId) {
-            return res.status(401).json({ success: false, message: 'WhatsApp Phone Number ID does not match the registered account.' });
+        if (!client) {
+            return res.status(404).json({ success: false, message: 'Your business account was not found. Please contact support.' });
         }
         
         // Generate Long-lived JWT Token
@@ -260,7 +274,8 @@ const wpLoginEmail = async (req, res) => {
                 _id: client._id,
                 businessName: client.businessName,
                 phoneNumberId: client.phoneNumberId,
-                wabaId: client.wabaId
+                wabaId: client.wabaId,
+                metaConnected: client.metaConnected
             },
             user: {
                 id: user._id,

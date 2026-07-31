@@ -20,16 +20,31 @@ const getAnalytics = async (req, res) => {
         const totalChats = await ChatHistory.countDocuments({ clientId });
         const totalLeads = await Lead.countDocuments({ clientId });
 
-        // Simple mock for graph (Real implementation would aggregate ChatHistory dates)
-        const recentActivity = [
-            { name: "Mon", messages: 12 },
-            { name: "Tue", messages: 19 },
-            { name: "Wed", messages: 15 },
-            { name: "Thu", messages: 25 },
-            { name: "Fri", messages: 32 },
-            { name: "Sat", messages: 10 },
-            { name: "Sun", messages: 8 },
-        ];
+        // Real aggregation: count messages per day for the last 7 days
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        const dailyActivity = await ChatHistory.aggregate([
+            { $match: { clientId: new (require('mongoose').Types.ObjectId)(clientId), updatedAt: { $gte: sevenDaysAgo } } },
+            { $unwind: '$messages' },
+            { $group: {
+                _id: { $dateToString: { format: '%Y-%m-%d', date: '$updatedAt' } },
+                messages: { $sum: 1 }
+            }},
+            { $sort: { _id: 1 } }
+        ]);
+
+        // Build a full 7-day array (fill in zero for days with no activity)
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const recentActivity = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            const dayName = dayNames[d.getDay()];
+            const found = dailyActivity.find(a => a._id === dateStr);
+            recentActivity.push({ name: dayName, messages: found ? found.messages : 0 });
+        }
 
         res.status(200).json({
             success: true,

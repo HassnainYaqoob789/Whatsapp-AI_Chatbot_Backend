@@ -17,6 +17,7 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim() === '') {
 const chatbotRoutes = require("./src/routes/chatbotRoutes");
 const clientRoutes = require("./src/routes/clientRoutes");
 const authRoutes = require("./src/routes/authRoutes");
+const metaRoutes = require("./src/routes/metaRoutes");
 const seedSuperAdmin = require("./src/utils/seedSuperAdmin");
 
 const app = express();
@@ -43,7 +44,11 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
-app.use(express.json());
+app.use(express.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf;
+    }
+}));
 
 // Global Rate Limiter backed by standard memory store
 // Note: In PM2 cluster mode without Redis, each instance tracks limits independently.
@@ -85,6 +90,9 @@ app.use("/api/chatbot", chatbotRoutes);
 
 // Client management routes
 app.use("/api/clients", clientRoutes);
+
+// Meta integration routes (Embedded Signup)
+app.use("/api/meta", metaRoutes);
 
 // --- Server Setup with Socket.io ---
 const http = require("http");
