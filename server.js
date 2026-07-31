@@ -61,6 +61,7 @@ const globalLimiter = rateLimit({
     max: 1000, // limit each IP to 1000 requests per windowMs
     standardHeaders: true, 
     legacyHeaders: false, 
+    validate: { xForwardedForHeader: false }, // Explicitly disable proxy header validation error
     message: { success: false, message: 'Too many requests from this IP, please try again later.' }
 });
 
