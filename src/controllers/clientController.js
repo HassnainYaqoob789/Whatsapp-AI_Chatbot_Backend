@@ -38,24 +38,26 @@ const createClient = async (req, res) => {
     try {
         const { businessName, phoneNumberId, whatsappToken, wabaId, systemPrompt, leadNotificationEmail, aiModel, aiApiKey } = req.body;
 
-        if (!businessName || !phoneNumberId || !whatsappToken || !wabaId || !systemPrompt) {
+        if (!businessName || !systemPrompt) {
             return res.status(400).json({ 
                 success: false, 
-                message: "businessName, phoneNumberId, whatsappToken, wabaId, and systemPrompt are required" 
+                message: "businessName and systemPrompt are required" 
             });
         }
 
-        // Check if phoneNumberId already exists
-        const existing = await Client.findOne({ phoneNumberId });
-        if (existing) {
-            return res.status(409).json({ success: false, message: "A client with this Phone Number ID already exists" });
+        // Check if phoneNumberId already exists (only if provided, which usually isn't during initial onboarding)
+        if (phoneNumberId) {
+            const existing = await Client.findOne({ phoneNumberId });
+            if (existing) {
+                return res.status(409).json({ success: false, message: "A client with this Phone Number ID already exists" });
+            }
         }
 
         const newClient = await new Client({
             businessName,
-            phoneNumberId,
-            whatsappToken,
-            wabaId,
+            phoneNumberId: phoneNumberId || '',
+            whatsappToken: whatsappToken || '',
+            wabaId: wabaId || '',
             systemPrompt,
             leadNotificationEmail: leadNotificationEmail || '',
             aiModel: aiModel || 'gpt-4o-mini',

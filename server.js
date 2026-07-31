@@ -21,6 +21,9 @@ const metaRoutes = require("./src/routes/metaRoutes");
 const seedSuperAdmin = require("./src/utils/seedSuperAdmin");
 
 const app = express();
+// Fix express-rate-limit error behind Nginx
+app.set("trust proxy", 1);
+
 const PORT = process.env.PORT || 9999;
 
 // --- Middleware ---
