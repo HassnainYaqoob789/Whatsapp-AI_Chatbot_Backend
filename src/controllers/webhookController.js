@@ -47,17 +47,9 @@ const verifyWebhook = async (req, res) => {
 
     if (mode && token) {
         if (mode === "subscribe") {
-            // Check if any client has this verify token
-            const client = await Client.findOne({ verifyToken: token });
-            if (client) {
-                console.log(`WEBHOOK_VERIFIED for client: ${client.businessName}`);
-                return res.status(200).send(challenge);
-            }
-
-            // Fallback: check env variable for backward compatibility
             const envToken = process.env.WHATSAPP_VERIFY_TOKEN;
             if (envToken && token === envToken) {
-                console.log("WEBHOOK_VERIFIED (env fallback)");
+                console.log("✅ WEBHOOK_VERIFIED (SaaS Global Webhook)");
                 return res.status(200).send(challenge);
             }
         }

@@ -20,10 +20,7 @@ const clientSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
-  verifyToken: {
-    type: String,
-    default: 'my_secret_verify_token_123',
-  },
+
   systemPrompt: {
     type: String,
     required: true,

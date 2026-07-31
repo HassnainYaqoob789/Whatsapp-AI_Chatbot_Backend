@@ -36,7 +36,7 @@ const getClientById = async (req, res) => {
 // Create a new client
 const createClient = async (req, res) => {
     try {
-        const { businessName, phoneNumberId, whatsappToken, wabaId, verifyToken, systemPrompt, leadNotificationEmail, aiModel, aiApiKey } = req.body;
+        const { businessName, phoneNumberId, whatsappToken, wabaId, systemPrompt, leadNotificationEmail, aiModel, aiApiKey } = req.body;
 
         if (!businessName || !phoneNumberId || !whatsappToken || !wabaId || !systemPrompt) {
             return res.status(400).json({ 
@@ -56,7 +56,6 @@ const createClient = async (req, res) => {
             phoneNumberId,
             whatsappToken,
             wabaId,
-            verifyToken: verifyToken || 'my_secret_verify_token_123',
             systemPrompt,
             leadNotificationEmail: leadNotificationEmail || '',
             aiModel: aiModel || 'gpt-4o-mini',

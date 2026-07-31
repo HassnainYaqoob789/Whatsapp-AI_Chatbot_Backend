@@ -128,7 +128,6 @@ const wpOnboard = async (req, res) => {
             whatsappPhoneNumberId, 
             wabaId,
             permanentToken, 
-            webhookVerifyToken, 
             systemPrompt, 
             leadNotificationEmail, 
             adminEmail, 
@@ -161,7 +160,6 @@ const wpOnboard = async (req, res) => {
             if (whatsappPhoneNumberId) client.phoneNumberId = whatsappPhoneNumberId;
             if (permanentToken) client.whatsappToken = permanentToken;
             if (wabaId) client.wabaId = wabaId;
-            if (webhookVerifyToken) client.verifyToken = webhookVerifyToken;
             if (systemPrompt) client.systemPrompt = systemPrompt;
             if (leadNotificationEmail) client.leadNotificationEmail = leadNotificationEmail;
             client.aiModel = aiModel || client.aiModel;
@@ -186,7 +184,6 @@ const wpOnboard = async (req, res) => {
                 phoneNumberId: whatsappPhoneNumberId || '',
                 whatsappToken: permanentToken || '',
                 wabaId: wabaId || '',
-                verifyToken: webhookVerifyToken || 'WABEX_SECRET_123',
                 systemPrompt: systemPrompt || `You are an AI assistant for ${businessName}. You help customers with their queries politely and professionally.`,
                 leadNotificationEmail: leadNotificationEmail || adminEmail,
                 isActive: true, 
