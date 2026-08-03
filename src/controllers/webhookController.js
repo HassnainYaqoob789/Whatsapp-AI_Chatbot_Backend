@@ -397,8 +397,11 @@ const handleIncomingMessage = async (req, res) => {
                     return;
                 }
 
-                // ── Handle Text Messages (Main AI Flow) ──
-                const messageText = messageObj.text?.body;
+                // ── Handle Text & Interactive Messages (Main AI Flow) ──
+                let messageText = messageObj.text?.body;
+                if (msgType === "interactive") {
+                    messageText = messageObj.interactive?.button_reply?.title || messageObj.interactive?.list_reply?.title || "";
+                }
 
                 if (messageText) {
                     console.log(`[${client.businessName}] Received from ${fromPhone}: ${messageText}`);
@@ -420,8 +423,8 @@ const handleIncomingMessage = async (req, res) => {
                                 const chatDoc = await ChatHistory.findOne({ phoneNumber: fromPhone, clientId });
                                 if (chatDoc && chatDoc.messages && chatDoc.messages.length > 0) {
                                     // ═══ Token Optimization: Reduce context window ═══
-                                    // Take only the last 6 messages (3 pairs) to keep token costs extremely low while maintaining conversation context
-                                    const recentMessages = chatDoc.messages.slice(-6);
+                                    // Take only the last 10 messages to keep token costs low while maintaining deep conversation context
+                                    const recentMessages = chatDoc.messages.slice(-10);
                                     history = recentMessages.map(m => ({ role: m.role, content: m.content }));
                                 }
                             } catch (dbErr) {
@@ -461,11 +464,11 @@ const handleIncomingMessage = async (req, res) => {
                                 return; // EXIT — No AI cost!
                             }
 
-                            // ═══ GLOBAL GREETINGS INTERCEPTOR (FREE) ═══
-                            // Hardcoded interceptor for common single-word/short greetings to save tokens
+                            // ═══ GLOBAL GREETINGS INTERCEPTOR (FREE for Cold New Chats Only) ═══
+                            // Hardcoded interceptor for cold first-time greetings to save tokens, without hijacking ongoing/broadcast context
                             const commonGreetings = ['hi', 'hello', 'hey', 'good morning', 'good evening', 'good afternoon', 'assalamualaikum', 'salam', 'hi there'];
-                            if (commonGreetings.includes(lowerMsg)) {
-                                console.log(`[${client.businessName}] Global Greeting intercepted: "${lowerMsg}" → FREE reply`);
+                            if (commonGreetings.includes(lowerMsg) && history.length === 0) {
+                                console.log(`[${client.businessName}] Cold Greeting intercepted: "${lowerMsg}" → FREE reply`);
                                 const greetingReply = `Hello! How can I assist you today? 😊`;
 
                                 await ChatHistory.findOneAndUpdate(
@@ -475,7 +478,6 @@ const handleIncomingMessage = async (req, res) => {
                                 );
                                 emitUpdate();
                                 await sendWhatsAppMessage(fromPhone, greetingReply, whatsappToken, phoneNumberId);
-                                return; // EXIT — No AI cost!
                             }
 
                             // ═══ AICACHE EXACT MATCH LOOKUP (FREE) ═══

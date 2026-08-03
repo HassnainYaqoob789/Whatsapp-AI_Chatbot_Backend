@@ -66,9 +66,10 @@ const broadcastTemplate = async (req, res) => {
             try {
                 // Build template components with variables
                 let components = null;
+                let parameters = [];
+
                 if (variableMapping && Object.keys(variableMapping).length > 0) {
                     const lead = leadsMap[phone] || {};
-                    const parameters = [];
 
                     // Sort variable keys numerically
                     const sortedKeys = Object.keys(variableMapping).sort((a, b) => Number(a) - Number(b));
@@ -124,7 +125,15 @@ const broadcastTemplate = async (req, res) => {
 
                         await ChatHistory.findOneAndUpdate(
                             { phoneNumber: phone, clientId },
-                            { $push: { messages: { role: "assistant", content: finalMessage } } },
+                            { 
+                                $push: { 
+                                    messages: { 
+                                        role: "assistant", 
+                                        content: finalMessage,
+                                        timestamp: new Date()
+                                    } 
+                                } 
+                            },
                             { upsert: true, new: true }
                         );
 
