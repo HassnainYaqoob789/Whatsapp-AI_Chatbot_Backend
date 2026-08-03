@@ -60,6 +60,7 @@ const broadcastTemplate = async (req, res) => {
         let successCount = 0;
         let failCount = 0;
         const failedNumbers = [];
+        let lastErrorMsg = '';
 
         for (const phone of uniqueRecipients) {
             try {
@@ -142,7 +143,10 @@ const broadcastTemplate = async (req, res) => {
             } catch (err) {
                 failCount++;
                 failedNumbers.push(phone);
-                console.error(`Broadcast failed for ${phone}:`, err.message);
+                const metaErr = err.response?.data?.error;
+                const errDetail = metaErr ? `(#${metaErr.code}) ${metaErr.message}` : err.message;
+                lastErrorMsg = errDetail;
+                console.error(`Broadcast failed for ${phone}:`, errDetail);
             }
         }
 
@@ -162,11 +166,17 @@ const broadcastTemplate = async (req, res) => {
             status,
         }).save();
 
+        let responseMessage = `Broadcast complete. Success: ${successCount}, Failed: ${failCount}`;
+        if (failCount > 0 && lastErrorMsg) {
+            responseMessage += ` — Meta Reason: ${lastErrorMsg}`;
+        }
+
         res.status(200).json({
-            success: true,
-            message: `Broadcast complete. Success: ${successCount}, Failed: ${failCount}`,
+            success: successCount > 0,
+            message: responseMessage,
             successCount,
             failedCount: failCount,
+            lastError: lastErrorMsg
         });
 
     } catch (error) {
