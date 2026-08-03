@@ -12,6 +12,7 @@ const { requireSuperAdmin } = require("../middleware/roleMiddleware");
 // 1. Client Admin routes
 router.get("/me/settings", authMiddleware, clientController.getMySettings);
 router.put("/me/settings", authMiddleware, clientController.updateMySettings);
+router.post("/me/test-smtp", authMiddleware, clientController.testSmtpConnection);
 
 // 2. Super Admin Analytics
 router.get("/analytics/global", authMiddleware, requireSuperAdmin, clientController.getGlobalAnalytics);

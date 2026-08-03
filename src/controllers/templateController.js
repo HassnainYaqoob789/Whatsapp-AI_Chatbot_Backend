@@ -5,7 +5,7 @@ const axios = require("axios");
 
 const sendTemplateManually = async (req, res) => {
     try {
-        const { to, templateName, variables } = req.body;
+        const { to, templateName, variables, templateBodyText } = req.body;
         const clientId = req.user.role === 'CLIENT_ADMIN' ? req.user.clientId : req.body.clientId;
 
         if (!to || !templateName) {
@@ -18,8 +18,13 @@ const sendTemplateManually = async (req, res) => {
         const result = await sendWhatsAppTemplate(to, templateName, client.whatsappToken, client.phoneNumberId, variables);
         
         if (result && result.messages) {
-            let content = `[Sent Template: ${templateName}]`;
-            if (variables && variables.length > 0) {
+            let content = templateBodyText || `[Sent Template: ${templateName}]`;
+            if (templateBodyText && variables && variables.length > 0) {
+                variables.forEach((val, idx) => {
+                    const placeholder = new RegExp(`\\{\\{${idx + 1}\\}\\}`, 'g');
+                    content = content.replace(placeholder, val);
+                });
+            } else if (!templateBodyText && variables && variables.length > 0) {
                 content += ` with variables: ${variables.join(', ')}`;
             }
 
@@ -87,7 +92,9 @@ const createTemplate = async (req, res) => {
         res.status(200).json({ success: true, data: response.data });
     } catch (error) {
         console.error("Error creating template:", error.response?.data || error.message);
-        res.status(500).json({ success: false, message: error.response?.data?.error?.message || "Failed to create template" });
+        const metaError = error.response?.data?.error;
+        const errorMsg = metaError?.error_user_msg || metaError?.message || error.message || "Failed to create template";
+        res.status(400).json({ success: false, message: errorMsg });
     }
 };
 

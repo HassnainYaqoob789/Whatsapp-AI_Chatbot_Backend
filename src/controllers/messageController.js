@@ -141,9 +141,9 @@ const sendManualMedia = async (req, res) => {
             return res.status(400).json({ success: false, message: "Please connect your WhatsApp account first via the Settings page." });
         }
 
-        const mediaId = await uploadMedia(file.path, file.mimetype, client.whatsappToken, client.phoneNumberId);
+        const mediaId = await uploadMedia(file.path, file.mimetype, client.whatsappToken, client.phoneNumberId, file.originalname);
         const msgType = file.mimetype.startsWith('image') ? 'image' : 'document';
-        const result = await sendMediaMessage(to, mediaId, msgType, caption, client.whatsappToken, client.phoneNumberId);
+        const result = await sendMediaMessage(to, mediaId, msgType, client.whatsappToken, client.phoneNumberId, caption, file.originalname);
 
         fs.unlinkSync(file.path);
 

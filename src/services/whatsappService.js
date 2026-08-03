@@ -212,7 +212,7 @@ async function uploadMedia(filePath, mimeType, token, phoneNumberId, originalnam
 }
 
 // --- Send media message ---
-async function sendMediaMessage(recipientPhone, mediaId, mediaType, token, phoneNumberId, caption = "") {
+async function sendMediaMessage(recipientPhone, mediaId, mediaType, token, phoneNumberId, caption = "", filename = "") {
     try {
         const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`;
         
@@ -226,6 +226,9 @@ async function sendMediaMessage(recipientPhone, mediaId, mediaType, token, phone
         
         if (caption && (mediaType === 'image' || mediaType === 'document' || mediaType === 'video')) {
             data[mediaType].caption = caption;
+        }
+        if (filename && mediaType === 'document') {
+            data[mediaType].filename = filename;
         }
 
         const headers = {

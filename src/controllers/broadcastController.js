@@ -1,6 +1,7 @@
 const Broadcast = require("../models/Broadcast");
 const Client = require("../models/Client");
 const Lead = require("../models/Lead");
+const ChatHistory = require("../models/ChatHistory");
 const { sendWhatsAppTemplate } = require("../services/whatsappService");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,6 +109,29 @@ const broadcastTemplate = async (req, res) => {
 
                 if (result) {
                     successCount++;
+
+                    // ── Save sent template to ChatHistory so AI and Live Chat have full context ──
+                    try {
+                        let readableContent = templateBodyText;
+                        if (readableContent && parameters.length > 0) {
+                            parameters.forEach((param, idx) => {
+                                const placeholder = new RegExp(`\\{\\{${idx + 1}\\}\\}`, 'g');
+                                readableContent = readableContent.replace(placeholder, param.text);
+                            });
+                        }
+                        const finalMessage = readableContent ? readableContent.trim() : `[Sent Template: ${templateName}]`;
+
+                        await ChatHistory.findOneAndUpdate(
+                            { phoneNumber: phone, clientId },
+                            { $push: { messages: { role: "assistant", content: finalMessage } } },
+                            { upsert: true, new: true }
+                        );
+
+                        const io = req.app.get("io");
+                        if (io) io.to(clientId.toString()).emit("chat-updated", { phone });
+                    } catch (historyErr) {
+                        console.error(`Error saving broadcast chat history for ${phone}:`, historyErr.message);
+                    }
                 } else {
                     failCount++;
                     failedNumbers.push(phone);

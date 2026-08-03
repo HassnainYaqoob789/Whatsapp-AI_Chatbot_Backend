@@ -418,23 +418,11 @@ const handleIncomingMessage = async (req, res) => {
                             let history = [];
                             try {
                                 const chatDoc = await ChatHistory.findOne({ phoneNumber: fromPhone, clientId });
-                                if (chatDoc) {
-                                    // ═══ Meta 24-Hour Policy Window Check ═══
-                                    const lastUpdated = new Date(chatDoc.updatedAt).getTime();
-                                    const hoursSinceLastMessage = (Date.now() - lastUpdated) / (1000 * 60 * 60);
-
-                                    if (hoursSinceLastMessage >= 24) {
-                                        console.log(`[${client.businessName}] Meta 24-Hour window expired for ${fromPhone}. Resetting chat history.`);
-                                        // Reset history in DB for this session
-                                        chatDoc.messages = [];
-                                        await chatDoc.save();
-                                        history = [];
-                                    } else if (chatDoc.messages) {
-                                        // ═══ Token Optimization: Reduce context window ═══
-                                        // Take only the last 6 messages (3 pairs) to keep token costs extremely low
-                                        const recentMessages = chatDoc.messages.slice(-6);
-                                        history = recentMessages.map(m => ({ role: m.role, content: m.content }));
-                                    }
+                                if (chatDoc && chatDoc.messages && chatDoc.messages.length > 0) {
+                                    // ═══ Token Optimization: Reduce context window ═══
+                                    // Take only the last 6 messages (3 pairs) to keep token costs extremely low while maintaining conversation context
+                                    const recentMessages = chatDoc.messages.slice(-6);
+                                    history = recentMessages.map(m => ({ role: m.role, content: m.content }));
                                 }
                             } catch (dbErr) {
                                 console.error("Error fetching chat history:", dbErr);

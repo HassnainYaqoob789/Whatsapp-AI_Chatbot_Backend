@@ -11,7 +11,7 @@ const Broadcast = require("../models/Broadcast");
 // List all clients
 const getAllClients = async (req, res) => {
     try {
-        const clients = await Client.find({}, '-whatsappToken').sort({ createdAt: -1 });
+        const clients = await Client.find({}, '-whatsappToken -smtpPassword -aiApiKey').sort({ createdAt: -1 });
         return res.status(200).json({ success: true, clients });
     } catch (error) {
         console.error("Error fetching clients:", error);
@@ -219,11 +219,92 @@ const updateMySettings = async (req, res) => {
         const clientData = client.toObject();
         delete clientData.whatsappToken;
         delete clientData.smtpPassword;
+        delete clientData.aiApiKey;
 
         return res.status(200).json({ success: true, client: clientData, message: "Settings updated successfully" });
     } catch (error) {
         console.error("Error updating settings:", error);
         return res.status(500).json({ success: false, message: "Failed to update settings" });
+    }
+};
+
+const testSmtpConnection = async (req, res) => {
+    try {
+        const clientId = req.user.clientId;
+        const client = await Client.findById(clientId);
+        if (!client) return res.status(404).json({ success: false, message: "Client not found" });
+
+        const { smtpHost, smtpPort, smtpUser, smtpPassword, smtpFrom, testRecipient } = req.body;
+
+        const host = (smtpHost || client.smtpHost || '').trim();
+        const port = Number(smtpPort || client.smtpPort || 465);
+        const user = (smtpUser || client.smtpUser || '').trim();
+        const pass = (smtpPassword !== undefined && smtpPassword !== '') ? smtpPassword.trim() : (client.smtpPassword || '').trim();
+        const from = (smtpFrom || client.smtpFrom || user).trim();
+        const to = (testRecipient || client.leadNotificationEmail || user).trim();
+
+        if (!host || !user || !pass) {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter SMTP Host, Username, and Password to test connection."
+            });
+        }
+
+        if (!to) {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter a test recipient email address or Lead Notification Email."
+            });
+        }
+
+        const nodemailer = require('nodemailer');
+        const secure = (port === 465);
+
+        const transporter = nodemailer.createTransport({
+            host,
+            port,
+            secure,
+            auth: { user, pass },
+            tls: { rejectUnauthorized: false },
+            connectionTimeout: 10000,
+            greetingTimeout: 5000,
+            socketTimeout: 10000,
+        });
+
+        // Verify credentials
+        await transporter.verify();
+
+        // Send test email
+        const info = await transporter.sendMail({
+            from: from || user,
+            to,
+            subject: `🧪 Test Email from ${client.businessName || 'Your AI Chatbot'}`,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                    <h2 style="color: #16a34a; margin-top: 0;">✅ SMTP Connection Successful!</h2>
+                    <p>This is a test email confirming that your business domain SMTP server is configured and working perfectly.</p>
+                    <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin-top: 15px;">
+                        <tr><td style="background-color: #f8fafc; font-weight: bold;">Business Name</td><td>${client.businessName}</td></tr>
+                        <tr><td style="background-color: #f8fafc; font-weight: bold;">SMTP Host</td><td>${host}</td></tr>
+                        <tr><td style="background-color: #f8fafc; font-weight: bold;">SMTP Port</td><td>${port}</td></tr>
+                        <tr><td style="background-color: #f8fafc; font-weight: bold;">Sender User</td><td>${user}</td></tr>
+                        <tr><td style="background-color: #f8fafc; font-weight: bold;">Recipient</td><td>${to}</td></tr>
+                    </table>
+                    <p style="margin-top: 20px; font-size: 13px; color: #64748b;">When WhatsApp leads are captured by the AI, notification emails will be delivered instantly using these credentials.</p>
+                </div>
+            `
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: `Test email sent successfully to ${to}!`
+        });
+    } catch (error) {
+        console.error("Test SMTP error:", error);
+        return res.status(400).json({
+            success: false,
+            message: `SMTP Connection Failed: ${error.message}`
+        });
     }
 };
 
@@ -310,5 +391,6 @@ module.exports = {
     toggleClient,
     getMySettings,
     updateMySettings,
+    testSmtpConnection,
     getGlobalAnalytics
 };
