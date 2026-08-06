@@ -112,12 +112,11 @@ async function getQuotaStatus(clientId) {
 
     client = await autoResetClientQuota(client);
 
-    const managedQuota = (client.useNaracordQuota !== undefined ? client.useNaracordQuota : client.useWabexQuota) !== false;
+    const managedQuota = client.useNaracordQuota !== false;
 
     return {
         businessName: client.businessName,
         useNaracordQuota: managedQuota,
-        useWabexQuota: managedQuota,
         monthly: {
             limit: client.monthlyTokenLimit,
             used: client.monthlyTokensUsed,

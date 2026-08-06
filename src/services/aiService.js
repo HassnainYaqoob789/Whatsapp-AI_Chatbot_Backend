@@ -7,7 +7,7 @@ const FormData = require("form-data");
 // Returns: { text: string, tokensUsed: number }
 async function generateAIResponse(userMessage, conversationHistory = [], systemPrompt, client, imageUrl = null, audioUrl = null) {
     let aiModel = client.aiModel || "gpt-4o-mini";
-    const useManagedQuota = (client.useNaracordQuota !== undefined ? client.useNaracordQuota : client.useWabexQuota) !== false;
+    const useManagedQuota = client.useNaracordQuota !== false;
     let aiApiKey = client.aiApiKey;
 
     // Use Naracord AI's managed key if user opted in

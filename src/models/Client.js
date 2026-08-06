@@ -46,10 +46,6 @@ const clientSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
-  useWabexQuota: {
-    type: Boolean,
-    default: true,
-  },
   origin: {
     type: String,
     enum: ['PLUGIN', 'DIRECT'],

@@ -129,6 +129,7 @@ const handleIncomingMessage = async (req, res) => {
 
                 // Extract client credentials for this request
                 const { whatsappToken, systemPrompt, leadNotificationEmail, _id: clientId } = client;
+                const isManagedQuota = client.useNaracordQuota !== false;
 
                 // Setup Socket.io Emitter
                 const io = req.app.get("io");
@@ -283,8 +284,6 @@ const handleIncomingMessage = async (req, res) => {
                     // ═══════════════════════════════════════
                     // 1. IMAGE PROCESSING
                     // ═══════════════════════════════════════
-                    const isManagedQuota = (client.useNaracordQuota !== undefined ? client.useNaracordQuota : client.useWabexQuota) !== false;
-
                     if (msgType === "image") {
                         if (isManagedQuota) {
                             const quotaCheck = await checkQuota(clientId);

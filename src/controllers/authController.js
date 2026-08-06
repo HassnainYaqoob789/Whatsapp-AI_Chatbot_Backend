@@ -23,11 +23,6 @@ const login = async (req, res) => {
         }
 
         let user = await User.findOne({ email });
-        if (!user && email.includes('@wabexai.com')) {
-            user = await User.findOne({ email: email.replace('@wabexai.com', '@naracord.com') });
-        } else if (!user && email.includes('@naracord.com')) {
-            user = await User.findOne({ email: email.replace('@naracord.com', '@wabexai.com') });
-        }
         if (!user) {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
@@ -139,8 +134,7 @@ const wpOnboard = async (req, res) => {
             adminPassword,
             aiModel,
             aiApiKey,
-            useNaracordQuota,
-            useWabexQuota
+            useNaracordQuota
         } = req.body;
 
         // Only businessName, adminEmail, adminPassword are truly required now
@@ -148,8 +142,8 @@ const wpOnboard = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Please provide Business Name, Email, and Password.' });
         }
 
-        // Determine managed quota choice
-        const managedQuota = (useNaracordQuota !== undefined ? useNaracordQuota : useWabexQuota) !== false;
+        // Determine managed quota choice (default true)
+        const managedQuota = (useNaracordQuota !== undefined ? useNaracordQuota : req.body.useWabexQuota) !== false;
 
         // Check if user email already exists
         const userExists = await User.findOne({ email: adminEmail });
@@ -174,7 +168,6 @@ const wpOnboard = async (req, res) => {
             client.aiModel = aiModel || client.aiModel;
             if (aiApiKey) client.aiApiKey = aiApiKey;
             client.useNaracordQuota = managedQuota;
-            client.useWabexQuota = managedQuota;
             await client.save();
             user = userExists;
 
@@ -200,7 +193,6 @@ const wpOnboard = async (req, res) => {
                 aiModel: aiModel || 'gpt-4o-mini',
                 aiApiKey: aiApiKey || '',
                 useNaracordQuota: managedQuota,
-                useWabexQuota: managedQuota,
                 origin: 'PLUGIN',
                 metaConnected: !!(whatsappPhoneNumberId && permanentToken && wabaId),
                 metaConnectedAt: (whatsappPhoneNumberId && permanentToken && wabaId) ? new Date() : undefined

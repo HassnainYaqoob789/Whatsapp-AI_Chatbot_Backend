@@ -62,8 +62,7 @@ const createClient = async (req, res) => {
             leadNotificationEmail: leadNotificationEmail || '',
             aiModel: aiModel || 'gpt-4o-mini',
             aiApiKey: aiApiKey || '',
-            useNaracordQuota: true, // Default all new clients to Naracord Managed Quota
-            useWabexQuota: true
+            useNaracordQuota: true // Default all new clients to Naracord Managed Quota
         }).save();
 
         console.log(`New client created: ${businessName} (${phoneNumberId})`);
@@ -184,7 +183,7 @@ const updateMySettings = async (req, res) => {
             return res.status(403).json({ success: false, message: "Only client admins can update their settings" });
         }
         
-        const { systemPrompt, leadNotificationEmail, whatsappToken, phoneNumberId, aiModel, aiApiKey, useNaracordQuota, useWabexQuota, country } = req.body;
+        const { systemPrompt, leadNotificationEmail, whatsappToken, phoneNumberId, aiModel, aiApiKey, useNaracordQuota, country } = req.body;
         const clientId = req.user.clientId;
 
         const client = await Client.findById(clientId);
@@ -198,10 +197,6 @@ const updateMySettings = async (req, res) => {
         if (aiApiKey !== undefined) client.aiApiKey = aiApiKey;
         if (useNaracordQuota !== undefined) {
             client.useNaracordQuota = useNaracordQuota;
-            client.useWabexQuota = useNaracordQuota;
-        } else if (useWabexQuota !== undefined) {
-            client.useNaracordQuota = useWabexQuota;
-            client.useWabexQuota = useWabexQuota;
         }
         if (country !== undefined) client.country = country;
 

@@ -18,7 +18,7 @@ const exchangeToken = async (req, res) => {
         }
 
         const appId = process.env.META_APP_ID;
-        const appSecret = process.env.META_APP_SECRET;
+        const appSecret = (process.env.META_APP_SECRET || '').split(',')[0].trim();
 
         if (!appId || !appSecret) {
             return res.status(500).json({ success: false, message: 'Server configuration missing (App ID or App Secret).' });

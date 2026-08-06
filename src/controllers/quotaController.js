@@ -100,13 +100,12 @@ const getUsageReport = async (req, res) => {
             success: true,
             period: `Last ${days} days`,
             clients: clients.map(c => {
-                const managedQuota = (c.useNaracordQuota !== undefined ? c.useNaracordQuota : c.useWabexQuota) !== false;
+                const managedQuota = c.useNaracordQuota !== false;
                 return {
                     _id: c._id,
                     businessName: c.businessName,
                     aiModel: c.aiModel,
                     useNaracordQuota: managedQuota,
-                    useWabexQuota: managedQuota,
                     isActive: c.isActive,
                     monthlyQuota: { limit: c.monthlyTokenLimit, used: c.monthlyTokensUsed },
                     dailyQuota: { limit: c.dailyTokenLimit, used: c.dailyTokensUsed },
