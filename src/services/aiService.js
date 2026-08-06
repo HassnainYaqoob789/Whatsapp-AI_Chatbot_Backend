@@ -1,5 +1,5 @@
 // AI Service - Multi-Brain Support
-// Powered by Wabex AI (OpenAI GPT-4o-mini default), OpenAI GPT-4o, and Google Gemini
+// Powered by Naracord AI (OpenAI GPT-4o-mini default), OpenAI GPT-4o, and Google Gemini
 
 const axios = require("axios");
 const FormData = require("form-data");
@@ -7,12 +7,12 @@ const FormData = require("form-data");
 // Returns: { text: string, tokensUsed: number }
 async function generateAIResponse(userMessage, conversationHistory = [], systemPrompt, client, imageUrl = null, audioUrl = null) {
     let aiModel = client.aiModel || "gpt-4o-mini";
-    const useWabexQuota = client.useWabexQuota !== false;
+    const useManagedQuota = (client.useNaracordQuota !== undefined ? client.useNaracordQuota : client.useWabexQuota) !== false;
     let aiApiKey = client.aiApiKey;
 
-    // Use Wabex AI's managed key if user opted in
-    if (useWabexQuota) {
-        aiModel = "gpt-4o-mini"; // Force override to prevent Gemini/GPT-4o crash on Wabex key
+    // Use Naracord AI's managed key if user opted in
+    if (useManagedQuota) {
+        aiModel = "gpt-4o-mini"; // Force override to prevent Gemini/GPT-4o crash on Naracord key
         aiApiKey = process.env.OPENAI_API_KEY;
         if (!aiApiKey) {
             console.error("CRITICAL: OPENAI_API_KEY is missing in backend .env!");
@@ -21,11 +21,11 @@ async function generateAIResponse(userMessage, conversationHistory = [], systemP
     } else {
         // User opted to bring their own key
         if (!aiApiKey) {
-            return { text: "Error: You have disabled 'Wabex AI Managed Quota' but have not provided your own API Key in the settings. Please enter your API key to continue using the bot.", tokensUsed: 0 };
+            return { text: "Error: You have disabled 'Naracord AI Managed Quota' but have not provided your own API Key in the settings. Please enter your API key to continue using the bot.", tokensUsed: 0 };
         }
     }
 
-    console.log(`Generating AI Response using model: ${aiModel} (Managed Quota: ${useWabexQuota})`);
+    console.log(`Generating AI Response using model: ${aiModel} (Managed Quota: ${useManagedQuota})`);
 
     let userContent = userMessage;
 
@@ -70,7 +70,7 @@ async function generateAIResponse(userMessage, conversationHistory = [], systemP
     } catch (error) {
         console.error(`Error in AI Service (${aiModel}):`, error.response?.data || error.message);
         // Better error for invalid custom keys
-        if (error.response?.status === 401 && !useWabexQuota) {
+        if (error.response?.status === 401 && !useManagedQuota) {
              return { text: "Error: The OpenAI API Key you provided is invalid or expired. Please update it in your settings.", tokensUsed: 0 };
         }
         return { text: "I'm sorry, I am currently facing a technical issue. Please try again later or contact support.", tokensUsed: 0 };

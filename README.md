@@ -1,6 +1,6 @@
-# 🤖 WhatsApp AI Chatbot
+# 🤖 NARACORD AI — Multi-Tenant WhatsApp Business AI Automation Platform
 
-A complete, production-ready WhatsApp AI Chatbot built with **Meta Cloud API** and **Pollinations AI (100% Free)**.
+A complete, production-ready WhatsApp AI Chatbot & Automation platform built with **Meta Cloud API**, **OpenAI GPT-4o-mini**, and **Google Gemini Flash**.
 
 This chatbot automatically replies to WhatsApp messages using AI, captures leads, sends email notifications, and provides a full dashboard API for managing chats and templates.
 

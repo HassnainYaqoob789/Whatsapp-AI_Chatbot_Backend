@@ -1,7 +1,7 @@
 {
-  "name": "whatsapp-ai-chatbot",
+  "name": "naracord-ai-backend",
   "version": "1.0.0",
-  "description": "WhatsApp AI Chatbot with Meta Cloud API, Pollinations AI, Lead Capture & Dashboard Inbox",
+  "description": "Naracord AI - Multi-Tenant WhatsApp Business AI Automation Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -9,7 +9,7 @@ const seedSuperAdmin = async () => {
         if (!existingSuperAdmin) {
             console.log('Seeding default Super Admin account...');
             const salt = await bcrypt.genSalt(10);
-            const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'WABEX_SUPER_SECRET_123!';
+            const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'NARACORD_SUPER_SECRET_123!';
             const hashedPassword = await bcrypt.hash(superAdminPassword, salt);
 
             await User.create({

@@ -104,7 +104,7 @@ If a user shows intent to buy, register, or get a demo, you must strictly follow
 You are a master closer, highly intelligent, and your only focus is FinSmart's success.`;
 
         // Check if admin already exists
-        let adminUser = await User.findOne({ email: 'finsmart@wabexai.com' });
+        let adminUser = await User.findOne({ email: 'finsmart@naracord.com' });
         
         if (adminUser) {
            console.log("Admin user already exists. Overwriting client data...");
@@ -131,7 +131,7 @@ You are a master closer, highly intelligent, and your only focus is FinSmart's s
         const hashedPassword = await bcrypt.hash('FinSmart@2026!', salt);
 
         const newAdmin = new User({
-            email: 'finsmart@wabexai.com',
+            email: 'finsmart@naracord.com',
             password: hashedPassword,
             role: 'CLIENT_ADMIN',
             clientId: newClient._id
@@ -140,7 +140,7 @@ You are a master closer, highly intelligent, and your only focus is FinSmart's s
         await newAdmin.save();
 
         console.log("Demo client FinSmart seeded successfully!");
-        console.log("Email: finsmart@wabexai.com");
+        console.log("Email: finsmart@naracord.com");
         console.log("Password: FinSmart@2026!");
         
         mongoose.connection.close();

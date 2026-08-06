@@ -58,7 +58,7 @@ const exchangeToken = async (req, res) => {
              throw new Error("Could not find a phone number for the WhatsApp Business Account.");
         }
 
-        // 4. Subscribe Webhook (Attach Wabex AI to their WABA)
+        // 4. Subscribe Webhook (Attach Naracord AI to their WABA)
         console.log(`[${client.businessName}] Subscribing webhook to WABA ${wabaId}...`);
         try {
             await axios.post(`https://graph.facebook.com/v20.0/${wabaId}/subscribed_apps`, null, {

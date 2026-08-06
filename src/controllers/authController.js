@@ -22,7 +22,12 @@ const login = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Please provide email and password' });
         }
 
-        const user = await User.findOne({ email });
+        let user = await User.findOne({ email });
+        if (!user && email.includes('@wabexai.com')) {
+            user = await User.findOne({ email: email.replace('@wabexai.com', '@naracord.com') });
+        } else if (!user && email.includes('@naracord.com')) {
+            user = await User.findOne({ email: email.replace('@naracord.com', '@wabexai.com') });
+        }
         if (!user) {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
@@ -134,6 +139,7 @@ const wpOnboard = async (req, res) => {
             adminPassword,
             aiModel,
             aiApiKey,
+            useNaracordQuota,
             useWabexQuota
         } = req.body;
 
@@ -141,6 +147,9 @@ const wpOnboard = async (req, res) => {
         if (!businessName || !adminEmail || !adminPassword) {
             return res.status(400).json({ success: false, message: 'Please provide Business Name, Email, and Password.' });
         }
+
+        // Determine managed quota choice
+        const managedQuota = (useNaracordQuota !== undefined ? useNaracordQuota : useWabexQuota) !== false;
 
         // Check if user email already exists
         const userExists = await User.findOne({ email: adminEmail });
@@ -164,7 +173,8 @@ const wpOnboard = async (req, res) => {
             if (leadNotificationEmail) client.leadNotificationEmail = leadNotificationEmail;
             client.aiModel = aiModel || client.aiModel;
             if (aiApiKey) client.aiApiKey = aiApiKey;
-            client.useWabexQuota = useWabexQuota !== false;
+            client.useNaracordQuota = managedQuota;
+            client.useWabexQuota = managedQuota;
             await client.save();
             user = userExists;
 
@@ -189,7 +199,8 @@ const wpOnboard = async (req, res) => {
                 isActive: true, 
                 aiModel: aiModel || 'gpt-4o-mini',
                 aiApiKey: aiApiKey || '',
-                useWabexQuota: useWabexQuota !== false,
+                useNaracordQuota: managedQuota,
+                useWabexQuota: managedQuota,
                 origin: 'PLUGIN',
                 metaConnected: !!(whatsappPhoneNumberId && permanentToken && wabaId),
                 metaConnectedAt: (whatsappPhoneNumberId && permanentToken && wabaId) ? new Date() : undefined

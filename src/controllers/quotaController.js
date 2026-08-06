@@ -2,7 +2,7 @@
 // QUOTA CONTROLLER - Token Usage & Limit APIs
 // =============================================================================
 
-const { getQuotaStatus } = require("../services/quotaService");
+const { getQuotaStatus, autoResetClientQuota } = require("../services/quotaService");
 const UsageLog = require("../models/UsageLog");
 const Client = require("../models/Client");
 
@@ -65,8 +65,13 @@ const getUsageReport = async (req, res) => {
         startDate.setDate(startDate.getDate() - parseInt(days));
         const startDateStr = startDate.toISOString().split('T')[0];
 
-        // Get all clients with their current quota status
-        const clients = await Client.find({}, 'businessName monthlyTokenLimit monthlyTokensUsed dailyTokenLimit dailyTokensUsed aiModel isActive useWabexQuota');
+        // Get all clients and auto-reset daily/monthly counters if needed
+        const rawClients = await Client.find({});
+        const clients = [];
+        for (const c of rawClients) {
+            const updated = await autoResetClientQuota(c);
+            clients.push(updated);
+        }
 
         // Get daily usage logs for the period
         const usageLogs = await UsageLog.aggregate([
@@ -94,15 +99,19 @@ const getUsageReport = async (req, res) => {
         return res.status(200).json({
             success: true,
             period: `Last ${days} days`,
-            clients: clients.map(c => ({
-                _id: c._id,
-                businessName: c.businessName,
-                aiModel: c.aiModel,
-                useWabexQuota: c.useWabexQuota !== false,
-                isActive: c.isActive,
-                monthlyQuota: { limit: c.monthlyTokenLimit, used: c.monthlyTokensUsed },
-                dailyQuota: { limit: c.dailyTokenLimit, used: c.dailyTokensUsed },
-            })),
+            clients: clients.map(c => {
+                const managedQuota = (c.useNaracordQuota !== undefined ? c.useNaracordQuota : c.useWabexQuota) !== false;
+                return {
+                    _id: c._id,
+                    businessName: c.businessName,
+                    aiModel: c.aiModel,
+                    useNaracordQuota: managedQuota,
+                    useWabexQuota: managedQuota,
+                    isActive: c.isActive,
+                    monthlyQuota: { limit: c.monthlyTokenLimit, used: c.monthlyTokensUsed },
+                    dailyQuota: { limit: c.dailyTokenLimit, used: c.dailyTokensUsed },
+                };
+            }),
             usageLogs,
         });
     } catch (error) {

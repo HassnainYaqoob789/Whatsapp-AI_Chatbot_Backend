@@ -1,5 +1,5 @@
-// Main Server Entry Point for WhatsApp AI Chatbot
-// This is a standalone, reusable WhatsApp AI Chatbot server.
+// Main Server Entry Point for Naracord AI - Multi-Tenant WhatsApp SaaS Platform
+// Fully configured and synced with Meta Developer App: Naracord AI (ID: 27708587325471275)
 
 require("dotenv").config();
 const express = require("express");

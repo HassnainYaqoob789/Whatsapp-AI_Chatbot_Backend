@@ -42,6 +42,10 @@ const clientSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  useNaracordQuota: {
+    type: Boolean,
+    default: true,
+  },
   useWabexQuota: {
     type: Boolean,
     default: true,

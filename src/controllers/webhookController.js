@@ -270,8 +270,10 @@ const handleIncomingMessage = async (req, res) => {
                     // ═══════════════════════════════════════
                     // 1. IMAGE PROCESSING
                     // ═══════════════════════════════════════
+                    const isManagedQuota = (client.useNaracordQuota !== undefined ? client.useNaracordQuota : client.useWabexQuota) !== false;
+
                     if (msgType === "image") {
-                        if (client.useWabexQuota !== false) {
+                        if (isManagedQuota) {
                             const quotaCheck = await checkQuota(clientId);
                             if (!quotaCheck.allowed) {
                                 console.log(`[${client.businessName}] Quota exceeded for ${fromPhone}: ${quotaCheck.reason}`);
@@ -289,7 +291,7 @@ const handleIncomingMessage = async (req, res) => {
                             console.log(`[${client.businessName}] Image received from ${fromPhone}`);
                             const history = await fetchHistory();
                             const aiResult = await generateAIResponse(caption, history, systemPrompt, client, imageUrl);
-                            if (aiResult.tokensUsed > 0 && client.useWabexQuota !== false) await deductTokens(clientId, aiResult.tokensUsed);
+                            if (aiResult.tokensUsed > 0 && isManagedQuota) await deductTokens(clientId, aiResult.tokensUsed);
                             await saveAndReply(`[Image Received] ${caption}`, aiResult.text);
                             return;
                         } catch (mediaErr) {
@@ -303,7 +305,7 @@ const handleIncomingMessage = async (req, res) => {
                     // 2. VOICE NOTE / AUDIO
                     // ═══════════════════════════════════════
                     if (msgType === "audio") {
-                        if (client.useWabexQuota !== false) {
+                        if (isManagedQuota) {
                             const quotaCheck = await checkQuota(clientId);
                             if (!quotaCheck.allowed) {
                                 console.log(`[${client.businessName}] Quota exceeded for ${fromPhone}: ${quotaCheck.reason}`);
@@ -320,7 +322,7 @@ const handleIncomingMessage = async (req, res) => {
                             console.log(`[${client.businessName}] Voice note received from ${fromPhone}`);
                             const history = await fetchHistory();
                             const aiResult = await generateAIResponse("The user sent a voice message. Please listen and respond.", history, systemPrompt, client, null, audioUrl);
-                            if (aiResult.tokensUsed > 0 && client.useWabexQuota !== false) await deductTokens(clientId, aiResult.tokensUsed);
+                            if (aiResult.tokensUsed > 0 && isManagedQuota) await deductTokens(clientId, aiResult.tokensUsed);
                             await saveAndReply("[Voice Note Received]", aiResult.text);
                             return;
                         } catch (mediaErr) {
@@ -334,7 +336,7 @@ const handleIncomingMessage = async (req, res) => {
                     // 3. PDF / DOCUMENT
                     // ═══════════════════════════════════════
                     if (msgType === "document") {
-                        if (client.useWabexQuota !== false) {
+                        if (isManagedQuota) {
                             const quotaCheck = await checkQuota(clientId);
                             if (!quotaCheck.allowed) {
                                 console.log(`[${client.businessName}] Quota exceeded for ${fromPhone}: ${quotaCheck.reason}`);
@@ -379,7 +381,7 @@ const handleIncomingMessage = async (req, res) => {
 
                             const history = await fetchHistory();
                             const aiResult = await generateAIResponse(userPrompt, history, systemPrompt, client);
-                            if (aiResult.tokensUsed > 0 && client.useWabexQuota !== false) await deductTokens(clientId, aiResult.tokensUsed);
+                            if (aiResult.tokensUsed > 0 && isManagedQuota) await deductTokens(clientId, aiResult.tokensUsed);
                             await saveAndReply(`[Document: ${docName}] ${caption}`, aiResult.text);
                             return;
                         } catch (mediaErr) {
@@ -502,7 +504,7 @@ const handleIncomingMessage = async (req, res) => {
                             }
 
                             // ═══ QUOTA CHECK: Before calling AI ═══
-                            if (client.useWabexQuota !== false) {
+                            if (isManagedQuota) {
                                 const quotaCheck = await checkQuota(clientId);
                                 if (!quotaCheck.allowed) {
                                     console.log(`[${client.businessName}] Quota exceeded for ${fromPhone}: ${quotaCheck.reason}`);
@@ -573,8 +575,8 @@ const handleIncomingMessage = async (req, res) => {
                                 aiReply = aiReply.replace(/\[\[LEAD_DATA:.*?\]\]/gi, '').trim();
                             }
 
-                            // Deduct tokens from client's quota (only if using Wabex Quota)
-                            if (aiResult.tokensUsed > 0 && client.useWabexQuota !== false) {
+                            // Deduct tokens from client's quota (only if using Naracord Managed Quota)
+                            if (aiResult.tokensUsed > 0 && isManagedQuota) {
                                 await deductTokens(clientId, aiResult.tokensUsed);
                             }
 
