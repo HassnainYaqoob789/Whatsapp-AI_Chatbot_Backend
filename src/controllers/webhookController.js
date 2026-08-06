@@ -62,20 +62,33 @@ const verifyWebhook = async (req, res) => {
 // 2. Handle Incoming Messages (WhatsApp → Server)
 // ─────────────────────────────────────────────
 const handleIncomingMessage = async (req, res) => {
-    // ── Webhook Security: Verify X-Hub-Signature-256 ──
+    // ── Webhook Security: Verify X-Hub-Signature-256 (Supports Multi-App Secrets) ──
     const signature = req.headers['x-hub-signature-256'];
-    const appSecret = process.env.META_APP_SECRET;
+    const appSecretEnv = process.env.META_APP_SECRET;
     
-    if (appSecret && signature && req.rawBody) {
+    if (appSecretEnv && signature && req.rawBody) {
         const crypto = require('crypto');
-        const hmac = crypto.createHmac('sha256', appSecret);
-        const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
+        const secrets = appSecretEnv.split(',').map(s => s.trim()).filter(Boolean);
         
-        if (!crypto.timingSafeEqual(Buffer.from(digest, 'utf8'), Buffer.from(signature, 'utf8'))) {
+        let isValid = false;
+        for (const secret of secrets) {
+            try {
+                const hmac = crypto.createHmac('sha256', secret);
+                const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
+                if (signature.length === digest.length && crypto.timingSafeEqual(Buffer.from(digest, 'utf8'), Buffer.from(signature, 'utf8'))) {
+                    isValid = true;
+                    break;
+                }
+            } catch (err) {
+                // Ignore and try next secret
+            }
+        }
+        
+        if (!isValid) {
             console.error('❌ Webhook Signature Verification Failed! Potential Attack.');
             return res.sendStatus(403);
         }
-    } else if (appSecret && !signature) {
+    } else if (appSecretEnv && !signature) {
         console.warn('⚠️ Webhook received without signature.');
     }
 
