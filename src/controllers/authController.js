@@ -143,7 +143,7 @@ const wpOnboard = async (req, res) => {
         }
 
         // Determine managed quota choice (default true)
-        const managedQuota = (useNaracordQuota !== undefined ? useNaracordQuota : req.body.useWabexQuota) !== false;
+        const managedQuota = useNaracordQuota !== false;
 
         // Check if user email already exists
         const userExists = await User.findOne({ email: adminEmail });
