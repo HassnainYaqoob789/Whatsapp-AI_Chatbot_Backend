@@ -219,6 +219,11 @@ const updateMySettings = async (req, res) => {
             }
         }
 
+        // ── Dynamic Webhook / External API Integration ──
+        const { externalApiUrl, externalApiKey } = req.body;
+        if (externalApiUrl !== undefined) client.externalApiUrl = externalApiUrl;
+        if (externalApiKey !== undefined) client.externalApiKey = externalApiKey;
+
         await client.save();
 
         // ── Invalidate in-memory client cache so next webhook uses fresh data ──

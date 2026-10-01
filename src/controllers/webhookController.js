@@ -561,14 +561,15 @@ const handleIncomingMessage = async (req, res) => {
                                 const name = parts[0] || 'Unknown';
                                 const phone = parts[1] || fromPhone;
                                 const email = parts[2] || '';
+                                const companyName = parts[3] || '';
 
                                 try {
                                     await Lead.findOneAndUpdate(
                                         { phone, clientId },
-                                        { $set: { name, email, source: 'WhatsApp AI' }, $setOnInsert: { clientId } },
+                                        { $set: { name, email, companyName, source: 'WhatsApp AI' }, $setOnInsert: { clientId } },
                                         { upsert: true, new: true }
                                     );
-                                    console.log(`[${client.businessName}] Lead saved: ${name} - ${phone}`);
+                                    console.log(`[${client.businessName}] Lead saved: ${name} - ${phone} - ${companyName}`);
 
                                     if (leadNotificationEmail) {
                                         const sendEmail = require("../utils/sendEmail");
@@ -591,6 +592,7 @@ const handleIncomingMessage = async (req, res) => {
                                                         <tr><td style="background-color: #f8f9fa; font-weight: bold;">Name</td><td>${name}</td></tr>
                                                         <tr><td style="background-color: #f8f9fa; font-weight: bold;">WhatsApp</td><td><a href="https://wa.me/${phone.replace(/[^0-9]/g, '')}">${phone}</a></td></tr>
                                                         <tr><td style="background-color: #f8f9fa; font-weight: bold;">Email</td><td>${email || 'Not Provided'}</td></tr>
+                                                        <tr><td style="background-color: #f8f9fa; font-weight: bold;">Company Name</td><td>${companyName || 'Not Provided'}</td></tr>
                                                     </table>
                                                     <br><p style="font-weight: bold;">Action Required: Contact this lead immediately!</p>
                                                 </div>
@@ -603,6 +605,57 @@ const handleIncomingMessage = async (req, res) => {
 
                                 aiReply = aiReply.replace(/\[\[LEAD_DATA:.*?\]\]/gi, '').trim();
                             }
+
+                            // ── UNIVERSAL API/WEBHOOK INTEGRATION (SaaS FEATURE) ──
+                            const apiMatch = aiReply.match(/\[\[API_CALL:\s*(\{.*?\})\s*\]\]/is);
+                            if (apiMatch) {
+                                const rawJson = apiMatch[1];
+                                aiReply = aiReply.replace(/\[\[API_CALL:.*?\]\]/gis, '').trim(); // Remove tag
+                                
+                                if (client.externalApiUrl) {
+                                    try {
+                                        const payload = JSON.parse(rawJson);
+                                        const axios = require('axios');
+                                        
+                                        console.log(`[${client.businessName}] Triggering External API: ${client.externalApiUrl}`);
+                                        
+                                        const apiResponse = await axios.post(client.externalApiUrl, payload, {
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'x-chatbot-api-key': client.externalApiKey || ''
+                                            },
+                                            timeout: 10000 // 10 seconds max
+                                        });
+
+                                        // Inject API Response back into chat history for AI to summarize
+                                        const apiDataString = JSON.stringify(apiResponse.data);
+                                        const systemFeedback = `[System Update: The external API was successfully called. The API returned this JSON response: ${apiDataString}. Please inform the user in a friendly way and provide them with their credentials or next steps based on this data.]`;
+                                        
+                                        history.push({ role: "user", content: combinedMessage }); // add current user msg
+                                        history.push({ role: "assistant", content: "..." }); // dummy placeholder for the API tag response
+                                        history.push({ role: "system", content: systemFeedback });
+                                        
+                                        // Re-run AI with the new system feedback
+                                        const secondAiResult = await generateAIResponse("API Call successful", history, systemPrompt, client);
+                                        aiReply = secondAiResult.text; // Replace the original reply with the new summarized reply
+                                        
+                                        if (secondAiResult.tokensUsed > 0 && isManagedQuota) {
+                                            await deductTokens(clientId, secondAiResult.tokensUsed);
+                                        }
+
+                                    } catch (apiErr) {
+                                        console.error(`[${client.businessName}] External API Call failed:`, apiErr.message);
+                                        // Tell AI that it failed
+                                        const systemFeedback = `[System Update: The external API call failed with error: ${apiErr.message}. Inform the user that there was a technical issue and ask them to try again later.]`;
+                                        history.push({ role: "system", content: systemFeedback });
+                                        const secondAiResult = await generateAIResponse("API Call failed", history, systemPrompt, client);
+                                        aiReply = secondAiResult.text;
+                                    }
+                                } else {
+                                    console.log(`[${client.businessName}] AI tried to call API but no externalApiUrl configured.`);
+                                }
+                            }
+
 
                             // Deduct tokens from client's quota (only if using Naracord Managed Quota)
                             if (aiResult.tokensUsed > 0 && isManagedQuota) {

@@ -120,6 +120,15 @@ const clientSchema = new mongoose.Schema({
     }],
     default: [],  // If empty, uses defaults: Learn More, Pricing & Plans, Talk to Team
   },
+  // ── Universal External Webhook/API (For SaaS Onboarding & Integrations) ──
+  externalApiUrl: {
+    type: String,
+    default: '',
+  },
+  externalApiKey: {
+    type: String,
+    default: '',
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Client', clientSchema);

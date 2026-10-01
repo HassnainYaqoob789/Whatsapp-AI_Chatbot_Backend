@@ -26,6 +26,9 @@ const leadSchema = new mongoose.Schema({
   email: {
     type: String,
   },
+  companyName: {
+    type: String,
+  },
   source: {
     type: String,
     default: 'WhatsApp AI',
