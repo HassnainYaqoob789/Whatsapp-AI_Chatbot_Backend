@@ -183,7 +183,7 @@ const updateMySettings = async (req, res) => {
             return res.status(403).json({ success: false, message: "Only client admins can update their settings" });
         }
         
-        const { systemPrompt, leadNotificationEmail, whatsappToken, phoneNumberId, aiModel, aiApiKey, useNaracordQuota, country } = req.body;
+        const { systemPrompt, leadNotificationEmail, whatsappToken, phoneNumberId, wabaId, aiModel, aiApiKey, useNaracordQuota, country } = req.body;
         const clientId = req.user.clientId;
 
         const client = await Client.findById(clientId);
@@ -193,6 +193,7 @@ const updateMySettings = async (req, res) => {
         if (leadNotificationEmail !== undefined) client.leadNotificationEmail = leadNotificationEmail;
         if (whatsappToken !== undefined) client.whatsappToken = whatsappToken;
         if (phoneNumberId !== undefined) client.phoneNumberId = phoneNumberId;
+        if (wabaId !== undefined) client.wabaId = wabaId;
         if (aiModel !== undefined) client.aiModel = aiModel;
         if (aiApiKey !== undefined) client.aiApiKey = aiApiKey;
         if (useNaracordQuota !== undefined) {
@@ -207,6 +208,16 @@ const updateMySettings = async (req, res) => {
         if (smtpUser     !== undefined) client.smtpUser     = smtpUser;
         if (smtpPassword !== undefined && smtpPassword !== '') client.smtpPassword = smtpPassword;
         if (smtpFrom     !== undefined) client.smtpFrom     = smtpFrom;
+
+        // ── Welcome Menu Configuration ──
+        const { welcomeMessage, welcomeButtons } = req.body;
+        if (welcomeMessage !== undefined) client.welcomeMessage = welcomeMessage;
+        if (welcomeButtons !== undefined) {
+            // Validate: max 3 buttons, each with id and title (max 20 chars)
+            if (Array.isArray(welcomeButtons) && welcomeButtons.length <= 3) {
+                client.welcomeButtons = welcomeButtons.filter(b => b.id && b.title && b.title.length <= 20);
+            }
+        }
 
         await client.save();
 

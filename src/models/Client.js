@@ -108,6 +108,18 @@ const clientSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  // ── Welcome Menu Configuration (Interactive Buttons on First Message) ──
+  welcomeMessage: {
+    type: String,
+    default: '',  // If empty, uses default: "Welcome to {businessName}! 👋\n\nHow can we help you today?"
+  },
+  welcomeButtons: {
+    type: [{
+      id: { type: String, required: true },
+      title: { type: String, required: true }
+    }],
+    default: [],  // If empty, uses defaults: Learn More, Pricing & Plans, Talk to Team
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Client', clientSchema);

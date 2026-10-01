@@ -7,7 +7,7 @@
 // =============================================================================
 
 const { generateAIResponse } = require("../services/aiService");
-const { sendWhatsAppMessage, sendWhatsAppTemplate, uploadMedia, sendMediaMessage } = require("../services/whatsappService");
+const { sendWhatsAppMessage, sendWhatsAppTemplate, uploadMedia, sendMediaMessage, sendInteractiveButtons } = require("../services/whatsappService");
 const ChatHistory = require("../models/ChatHistory");
 const Client = require("../models/Client");
 const Lead = require("../models/Lead");
@@ -479,19 +479,36 @@ const handleIncomingMessage = async (req, res) => {
                             }
 
                             // ═══ GLOBAL GREETINGS INTERCEPTOR (FREE for Cold New Chats Only) ═══
-                            // Hardcoded interceptor for cold first-time greetings to save tokens, without hijacking ongoing/broadcast context
-                            const commonGreetings = ['hi', 'hello', 'hey', 'good morning', 'good evening', 'good afternoon', 'assalamualaikum', 'salam', 'hi there'];
+                            // Sends an interactive welcome message with quick-reply buttons so the customer
+                            // can tap an option instead of typing — maximizes automation, minimizes back-and-forth.
+                            // Buttons are fully configurable per-client from their dashboard settings.
+                            const commonGreetings = ['hi', 'hello', 'hey', 'good morning', 'good evening', 'good afternoon', 'assalamualaikum', 'salam', 'hi there', 'aoa'];
                             if (commonGreetings.includes(lowerMsg) && history.length === 0) {
-                                console.log(`[${client.businessName}] Cold Greeting intercepted: "${lowerMsg}" → FREE reply`);
-                                const greetingReply = `Hello! How can I assist you today? 😊`;
+                                console.log(`[${client.businessName}] Cold Greeting intercepted: "${lowerMsg}" → Interactive Welcome Menu (FREE)`);
+                                
+                                // Use client's custom welcome message, or default
+                                const welcomeBody = (client.welcomeMessage && client.welcomeMessage.trim())
+                                    ? client.welcomeMessage
+                                    : `Welcome to *${client.businessName}*! 👋\n\nHow can we help you today? Please tap an option below:`;
+                                
+                                // Use client's custom buttons, or defaults
+                                const welcomeButtons = (client.welcomeButtons && client.welcomeButtons.length > 0)
+                                    ? client.welcomeButtons.slice(0, 3)
+                                    : [
+                                        { id: "btn_learn_more", title: "Learn More" },
+                                        { id: "btn_pricing", title: "Pricing & Plans" },
+                                        { id: "btn_talk_to_human", title: "Talk to Team" }
+                                    ];
 
+                                const greetingLogText = `[Welcome Menu Sent]\n${welcomeButtons.map(b => `• ${b.title}`).join('\n')}`;
                                 await ChatHistory.findOneAndUpdate(
                                     { phoneNumber: fromPhone, clientId },
-                                    { $push: { messages: { $each: [{ role: "user", content: combinedMessage }, { role: "assistant", content: greetingReply }], $slice: -50 } } },
+                                    { $push: { messages: { $each: [{ role: "user", content: combinedMessage }, { role: "assistant", content: greetingLogText }], $slice: -50 } } },
                                     { upsert: true, new: true }
                                 );
                                 emitUpdate();
-                                await sendWhatsAppMessage(fromPhone, greetingReply, whatsappToken, phoneNumberId);
+                                await sendInteractiveButtons(fromPhone, welcomeBody, welcomeButtons, whatsappToken, phoneNumberId);
+                                return; // EXIT — No AI cost!
                             }
 
                             // ═══ AICACHE EXACT MATCH LOOKUP (FREE) ═══
