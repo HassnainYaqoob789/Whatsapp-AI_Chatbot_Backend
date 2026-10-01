@@ -44,7 +44,7 @@ async function generateAIResponse(userMessage, conversationHistory = [], systemP
     // For OpenAI: build image content array
     if (imageUrl && (aiModel === "gpt-4o-mini" || aiModel === "gpt-4o")) {
         userContent = [
-            { type: "text", text: userMessage || "Please describe this image." },
+            { type: "text", text: userMessage || "[User uploaded an image. Please review it in the context of our current conversation and respond accordingly.]" },
             { type: "image_url", image_url: { url: imageUrl } }
         ];
     }
