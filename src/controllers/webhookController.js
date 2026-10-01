@@ -17,6 +17,7 @@ const AICache = require("../models/AICache");
 const { checkQuota, deductTokens } = require("../services/quotaService");
 const pdfParse = require("pdf-parse");
 const fs = require("fs");
+const axios = require("axios");
 const { getClientByPhoneId, invalidateClientCache } = require("../utils/clientHelper");
 const { isDuplicateMessage, addMessageToBuffer, flushMessageBuffer, getBufferCount } = require("../services/cacheService");
 
@@ -253,7 +254,7 @@ const handleIncomingMessage = async (req, res) => {
 
                     // ── Helper: Download media from Meta ──
                     const downloadMedia = async (mediaId) => {
-                        const mediaUrlRes = await axios.get(`https://graph.facebook.com/v25.0/${mediaId}`, { headers: { Authorization: `Bearer ${whatsappToken}` } });
+                        const mediaUrlRes = await axios.get(`https://graph.facebook.com/v20.0/${mediaId}`, { headers: { Authorization: `Bearer ${whatsappToken}` } });
                         const downloadUrl = mediaUrlRes.data.url;
                         const mediaRes = await axios.get(downloadUrl, { headers: { Authorization: `Bearer ${whatsappToken}` }, responseType: 'arraybuffer' });
                         return Buffer.from(mediaRes.data, 'binary');

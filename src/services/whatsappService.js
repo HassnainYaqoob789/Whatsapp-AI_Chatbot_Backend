@@ -9,7 +9,7 @@ const fs = require("fs");
 // --- Send a simple text message ---
 async function sendWhatsAppMessage(recipientPhone, messageText, token, phoneNumberId) {
     try {
-        const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`;
+        const url = `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`;
         
         const data = {
             messaging_product: "whatsapp",
@@ -39,7 +39,7 @@ async function sendWhatsAppMessage(recipientPhone, messageText, token, phoneNumb
 // --- Send emoji reaction to a message ---
 async function sendReaction(recipientPhone, messageId, emoji = "⏳", token, phoneNumberId) {
     try {
-        const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`;
+        const url = `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`;
         
         const data = {
             messaging_product: "whatsapp",
@@ -64,7 +64,7 @@ async function sendReaction(recipientPhone, messageId, emoji = "⏳", token, pho
 // --- Send typing indicator ---
 async function sendTypingIndicator(messageId, token, phoneNumberId) {
     try {
-        const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`;
+        const url = `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`;
         
         const data = {
             messaging_product: "whatsapp",
@@ -89,7 +89,7 @@ async function sendTypingIndicator(messageId, token, phoneNumberId) {
 // --- Send interactive button message ---
 async function sendInteractiveButtons(recipientPhone, bodyText, buttons, token, phoneNumberId) {
     try {
-        const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`;
+        const url = `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`;
         
         const data = {
             messaging_product: "whatsapp",
@@ -132,7 +132,7 @@ async function getWhatsAppAnalytics(token, wabaId) {
         const start = Math.floor(lastMonth.getTime() / 1000);
         const end = Math.floor(today.getTime() / 1000);
 
-        const url = `https://graph.facebook.com/v25.0/${wabaId}/conversation_analytics`;
+        const url = `https://graph.facebook.com/v20.0/${wabaId}/conversation_analytics`;
         const params = { start, end, granularity: "DAILY" };
 
         const headers = {
@@ -151,7 +151,7 @@ async function getWhatsAppAnalytics(token, wabaId) {
 // --- Send a pre-approved Template message ---
 async function sendWhatsAppTemplate(recipientPhone, templateName, languageCode = "en_US", components = null, token, phoneNumberId) {
     try {
-        const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`;
+        const url = `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`;
         
         const data = {
             messaging_product: "whatsapp",
@@ -184,7 +184,7 @@ async function sendWhatsAppTemplate(recipientPhone, templateName, languageCode =
 // --- Upload media to Meta ---
 async function uploadMedia(filePath, mimeType, token, phoneNumberId, originalname) {
     try {
-        const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/media`;
+        const url = `https://graph.facebook.com/v20.0/${phoneNumberId}/media`;
         const form = new FormData();
         
         // Meta API requires a valid filename with an extension for media uploads.
@@ -214,7 +214,7 @@ async function uploadMedia(filePath, mimeType, token, phoneNumberId, originalnam
 // --- Send media message ---
 async function sendMediaMessage(recipientPhone, mediaId, mediaType, token, phoneNumberId, caption = "", filename = "") {
     try {
-        const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`;
+        const url = `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`;
         
         // mediaType can be 'image', 'document', 'audio', 'video'
         const data = {
