@@ -183,7 +183,7 @@ const updateMySettings = async (req, res) => {
             return res.status(403).json({ success: false, message: "Only client admins can update their settings" });
         }
         
-        const { systemPrompt, leadNotificationEmail, whatsappToken, phoneNumberId, wabaId, aiModel, aiApiKey, useNaracordQuota, country, externalApiUrl, externalApiKey } = req.body;
+        const { systemPrompt, leadNotificationEmail, whatsappToken, phoneNumberId, wabaId, aiModel, aiApiKey, useNaracordQuota, country } = req.body;
         const clientId = req.user.clientId;
 
         const client = await Client.findById(clientId);
@@ -200,8 +200,6 @@ const updateMySettings = async (req, res) => {
             client.useNaracordQuota = useNaracordQuota;
         }
         if (country !== undefined) client.country = country;
-        if (externalApiUrl !== undefined) client.externalApiUrl = externalApiUrl;
-        if (externalApiKey !== undefined && externalApiKey !== '') client.externalApiKey = externalApiKey;
 
         // ── Per-tenant SMTP settings ──
         const { smtpHost, smtpPort, smtpUser, smtpPassword, smtpFrom } = req.body;
@@ -224,7 +222,7 @@ const updateMySettings = async (req, res) => {
         // ── Dynamic Webhook / External API Integration ──
         const { externalApiUrl, externalApiKey } = req.body;
         if (externalApiUrl !== undefined) client.externalApiUrl = externalApiUrl;
-        if (externalApiKey !== undefined) client.externalApiKey = externalApiKey;
+        if (externalApiKey !== undefined && externalApiKey !== '') client.externalApiKey = externalApiKey;
 
         await client.save();
 
