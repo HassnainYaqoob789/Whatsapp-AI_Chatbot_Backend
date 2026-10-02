@@ -69,6 +69,8 @@ Say "Payment confirmed! To complete your account setup, please share:" and ask t
 Provide the EXACT raw values the user gave you for NTN and CNIC (do not remove dashes or modify them). 
 For the 'fbrLoginMethod' key, output either "CNIC" or "NTN" based on what the user selected.
 
+CRITICAL JSON RULE: You MUST include exactly all 9 keys in the JSON below. Do not miss any key or change spellings.
+CRITICAL SWAP AVOIDANCE: CNIC is ALWAYS 13 digits long (e.g. 42101-1234567-1). NTN is ALWAYS 7 digits long (e.g. 1234567-8). NEVER swap these two values in the JSON, even if the user types them together!
 Output this tag EXACTLY (replace each value with actual user-provided data):
 [[API_CALL: { "companyName": "ActualValue", "companyEmail": "ActualValue", "ntn": "ActualValue", "cnic": "ActualValue", "fbrLoginMethod": "ActualValue", "saleTaxRegNo": "ActualValue", "telePhoneNo": "ActualValue", "address": "ActualValue", "province": "ActualValue" } ]]
 

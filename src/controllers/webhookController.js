@@ -626,9 +626,14 @@ const handleIncomingMessage = async (req, res) => {
                                 if (client.externalApiUrl) {
                                     try {
                                         const payload = JSON.parse(rawJson);
+                                        
+                                        // FOOLPROOF FIX: Always inject the WhatsApp number automatically
+                                        payload.telePhoneNo = fromPhone;
+                                        
                                         const axios = require('axios');
                                         
                                         console.log(`[${client.businessName}] Triggering External API: ${client.externalApiUrl}`);
+                                        console.log(`[Payload Sent]:`, JSON.stringify(payload, null, 2));
                                         
                                         const apiResponse = await axios.post(client.externalApiUrl, payload, {
                                             headers: {
