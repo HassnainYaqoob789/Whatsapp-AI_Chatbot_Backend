@@ -17,6 +17,22 @@ const getAnalytics = async (req, res) => {
     try {
         const clientId = req.user.role === 'CLIENT_ADMIN' ? req.user.clientId : req.query.clientId;
 
+        // Fetch client to get WhatsApp credentials
+        const Client = require("../models/Client");
+        const client = await Client.findById(clientId);
+        
+        let metaAnalytics = [];
+        if (client && client.whatsappToken && client.wabaId) {
+            try {
+                const { getWhatsAppAnalytics } = require("../services/whatsappService");
+                const metaRes = await getWhatsAppAnalytics(client.whatsappToken, client.wabaId);
+                metaAnalytics = metaRes.data || [];
+            } catch (metaErr) {
+                console.error("Meta analytics fetch failed:", metaErr.message);
+                // Fail gracefully if Meta API fails
+            }
+        }
+
         const totalChats = await ChatHistory.countDocuments({ clientId });
         const totalLeads = await Lead.countDocuments({ clientId });
 
@@ -48,6 +64,7 @@ const getAnalytics = async (req, res) => {
 
         res.status(200).json({
             success: true,
+            analytics: metaAnalytics,
             data: {
                 totalChats,
                 totalLeads,
