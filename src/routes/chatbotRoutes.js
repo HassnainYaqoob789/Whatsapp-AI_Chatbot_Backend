@@ -36,6 +36,7 @@ const multer = require("multer");
 const upload = multer({ dest: "uploads/" });
 
 router.patch("/chats/:phone/toggle-ai", authMiddleware, messageController.toggleAi);
+router.patch("/chats/:phone/read", authMiddleware, messageController.markAsRead);
 router.post("/chats/send-message", authMiddleware, messageController.sendManualMessage);
 router.post("/chats/send-media", authMiddleware, upload.single("media"), messageController.sendManualMedia);
 

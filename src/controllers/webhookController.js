@@ -110,6 +110,12 @@ const handleIncomingMessage = async (req, res) => {
                 const fromPhone = messageObj.from;
                 const msgType = messageObj.type;
 
+                // Extract customer name from payload
+                let customerName = "";
+                if (value.contacts && value.contacts.length > 0 && value.contacts[0].profile && value.contacts[0].profile.name) {
+                    customerName = value.contacts[0].profile.name;
+                }
+
                 // ── Deduplication: ignore if we already processed this message_id (Cluster-Safe) ──
                 if (await isDuplicateMessage(messageObj.id)) return;
 
@@ -126,7 +132,7 @@ const handleIncomingMessage = async (req, res) => {
                     return;
                 }
 
-                console.log(`[${client.businessName}] Message from ${fromPhone} (type: ${msgType})`);
+                console.log(`[${client.businessName}] Message from ${fromPhone} (${customerName}) (type: ${msgType})`);
 
                 // Extract client credentials for this request
                 const { whatsappToken, systemPrompt, leadNotificationEmail, _id: clientId } = client;
@@ -141,7 +147,10 @@ const handleIncomingMessage = async (req, res) => {
                 // Check if AI is paused for this specific chat
                 let chatDoc = await ChatHistory.findOne({ phoneNumber: fromPhone, clientId });
                 if (!chatDoc) {
-                    chatDoc = await new ChatHistory({ phoneNumber: fromPhone, clientId, isAiPaused: false }).save();
+                    chatDoc = await new ChatHistory({ phoneNumber: fromPhone, clientId, customerName, isAiPaused: false }).save();
+                } else if (customerName && chatDoc.customerName !== customerName) {
+                    chatDoc.customerName = customerName;
+                    await chatDoc.save();
                 }
 
                 if (chatDoc.isAiPaused) {
@@ -151,7 +160,7 @@ const handleIncomingMessage = async (req, res) => {
 
                     await ChatHistory.findOneAndUpdate(
                         { phoneNumber: fromPhone, clientId },
-                        { $push: { messages: { role: "user", content: contentToSave } } }
+                        { $push: { messages: { role: "user", content: contentToSave } }, $inc: { unreadCount: 1 } }
                     );
                     emitUpdate(); // Notify frontend
                     return;
@@ -559,8 +568,9 @@ const handleIncomingMessage = async (req, res) => {
                             if (leadMatch) {
                                 const rawData = leadMatch[1];
                                 const parts = rawData.split('|').map(s => s.trim());
-                                const name = parts[0] || 'Unknown';
-                                const phone = parts[1] || fromPhone;
+                                // If AI leaves name blank, use the WhatsApp profile name we captured earlier.
+                                const name = (parts[0] && parts[0] !== '') ? parts[0] : (chatDoc?.customerName || 'Unknown');
+                                const phone = (parts[1] && parts[1] !== '') ? parts[1] : fromPhone;
                                 const email = parts[2] || '';
                                 const companyName = parts[3] || '';
 
@@ -680,7 +690,10 @@ const handleIncomingMessage = async (req, res) => {
                             try {
                                 await ChatHistory.findOneAndUpdate(
                                     { phoneNumber: fromPhone, clientId },
-                                    { $push: { messages: { $each: [{ role: "user", content: combinedMessage }, { role: "assistant", content: aiReply }], $slice: -50 } } },
+                                    { 
+                                        $push: { messages: { $each: [{ role: "user", content: combinedMessage }, { role: "assistant", content: aiReply }], $slice: -50 } },
+                                        $inc: { unreadCount: 1 }
+                                    },
                                     { upsert: true, new: true }
                                 );
                                 emitUpdate();

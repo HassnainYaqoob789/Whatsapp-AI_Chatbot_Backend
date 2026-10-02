@@ -12,9 +12,17 @@ const chatHistorySchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  customerName: {
+    type: String,
+    default: "",
+  },
   isAiPaused: {
     type: Boolean,
     default: false,
+  },
+  unreadCount: {
+    type: Number,
+    default: 0,
   },
   messages: [{
     role: {

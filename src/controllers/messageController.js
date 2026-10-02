@@ -167,10 +167,26 @@ const sendManualMedia = async (req, res) => {
     }
 };
 
+const markAsRead = async (req, res) => {
+    try {
+        const { phone } = req.params;
+        const clientId = req.user.role === 'CLIENT_ADMIN' ? req.user.clientId : req.body.clientId;
+        await ChatHistory.findOneAndUpdate(
+            { phoneNumber: phone, clientId },
+            { $set: { unreadCount: 0 } }
+        );
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error("Error marking as read:", error);
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
 module.exports = {
     getAllChats,
     getChatByPhone,
     toggleAi,
     sendManualMessage,
-    sendManualMedia
+    sendManualMedia,
+    markAsRead
 };
