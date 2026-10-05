@@ -18,6 +18,8 @@ const chatbotRoutes = require("./src/routes/chatbotRoutes");
 const clientRoutes = require("./src/routes/clientRoutes");
 const authRoutes = require("./src/routes/authRoutes");
 const metaRoutes = require("./src/routes/metaRoutes");
+const discordRoutes = require("./src/routes/discordRoutes");
+const discordGateway = require("./src/discord/gatewayManager");
 const seedSuperAdmin = require("./src/utils/seedSuperAdmin");
 
 const app = express();
@@ -74,6 +76,7 @@ mongoose.connect(MONGODB_URI)
     .then(async () => {
         console.log("✅ MongoDB Connected Successfully");
         await seedSuperAdmin();
+        discordGateway.startAll().catch(e => console.error("Discord startup error:", e.message));
     })
     .catch((err) => {
         console.error("❌ MongoDB Connection Error:", err.message);
@@ -97,6 +100,9 @@ app.use("/api/clients", clientRoutes);
 
 // Meta integration routes (Embedded Signup)
 app.use("/api/meta", metaRoutes);
+
+// Discord AI Moderator integration (opt-in per client)
+app.use("/api/discord", discordRoutes);
 
 // --- Server Setup with Socket.io ---
 const http = require("http");

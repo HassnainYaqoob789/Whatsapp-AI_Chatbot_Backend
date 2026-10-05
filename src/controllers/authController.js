@@ -32,6 +32,7 @@ const login = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
+        let clientChannels = undefined;
         // Verify if Client still exists for CLIENT_ADMIN
         if (user.role === 'CLIENT_ADMIN' && user.clientId) {
             const client = await Client.findById(user.clientId);
@@ -40,6 +41,7 @@ const login = async (req, res) => {
                 await User.findByIdAndDelete(user._id);
                 return res.status(401).json({ success: false, message: 'Your business account has been deleted by the Super Admin.' });
             }
+            clientChannels = client.channels;
         }
 
         const token = generateToken(user._id);
@@ -51,7 +53,8 @@ const login = async (req, res) => {
                 id: user._id,
                 email: user.email,
                 role: user.role,
-                clientId: user.clientId
+                clientId: user.clientId,
+                clientChannels: clientChannels
             }
         });
     } catch (error) {
@@ -110,7 +113,15 @@ const createClientAdmin = async (req, res) => {
 const getMe = async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
-        res.status(200).json({ success: true, user });
+        let clientChannels = undefined;
+        if (user.role === 'CLIENT_ADMIN' && user.clientId) {
+            const client = await Client.findById(user.clientId);
+            if (client) clientChannels = client.channels;
+        }
+        res.status(200).json({ 
+            success: true, 
+            user: { ...user.toObject(), clientChannels } 
+        });
     } catch (error) {
         console.error('Error fetching user profile:', error);
         res.status(500).json({ success: false, message: 'Server error fetching profile' });

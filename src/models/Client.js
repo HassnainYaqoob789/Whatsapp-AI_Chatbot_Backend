@@ -129,6 +129,58 @@ const clientSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  // ── Channels (WhatsApp is on by default; Discord is opt-in) ──
+  channels: {
+    whatsapp: { type: Boolean, default: true },
+    discord: { type: Boolean, default: false },
+  },
+  // ── Discord AI Moderator Configuration ──
+  discord: {
+    guildId: { type: String, default: '', index: true },
+    guildName: { type: String, default: '' },
+    botMode: { type: String, enum: ['shared', 'custom'], default: 'shared' },
+    customBotToken: { type: String, default: '', select: false }, // AES-encrypted
+    allowedChannelIds: { type: [String], default: [] }, // empty = all channels
+    modLogChannelId: { type: String, default: '' },
+    moderatorPrompt: { type: String, default: '' },
+    // Community Privacy Policy & Terms - used to answer questions AND to judge violations
+    policy: {
+      privacyPolicy: { type: String, default: '' },
+      terms: { type: String, default: '' },
+    },
+    // Dynamic rules set by the client: keywords and/or plain-language description (AI judged)
+    rules: {
+      type: [{
+        name: { type: String, required: true },
+        description: { type: String, default: '' },
+        keywords: { type: [String], default: [] },
+        action: { type: String, enum: ['warn', 'delete', 'timeout', 'kick', 'ban'], default: 'delete' },
+      }],
+      default: [],
+    },
+    moderation: {
+      enabled: { type: Boolean, default: true },
+      dryRun: { type: Boolean, default: true }, // log-only until client turns it off
+      bannedWords: { type: [String], default: [] },
+      spamLimit: { type: Number, default: 5 }, // msgs per 10s per user
+      aiClassify: { type: Boolean, default: false },
+      actions: {
+        delete: { type: Boolean, default: true },
+        warn: { type: Boolean, default: true },
+        timeout: { type: Boolean, default: true },
+        kick: { type: Boolean, default: true },
+        ban: { type: Boolean, default: false },
+      },
+      // After N strikes inside windowDays, apply `action` automatically
+      escalation: {
+        strikeLimit: { type: Number, default: 3 },
+        windowDays: { type: Number, default: 7 },
+        action: { type: String, enum: ['none', 'timeout', 'kick', 'ban'], default: 'kick' },
+        timeoutMinutes: { type: Number, default: 60 },
+      },
+    },
+    connectedAt: { type: Date },
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Client', clientSchema);

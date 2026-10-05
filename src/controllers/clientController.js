@@ -36,7 +36,7 @@ const getClientById = async (req, res) => {
 // Create a new client
 const createClient = async (req, res) => {
     try {
-        const { businessName, phoneNumberId, whatsappToken, wabaId, systemPrompt, leadNotificationEmail, aiModel, aiApiKey } = req.body;
+        const { businessName, phoneNumberId, whatsappToken, wabaId, systemPrompt, leadNotificationEmail, aiModel, aiApiKey, channels } = req.body;
 
         if (!businessName || !systemPrompt) {
             return res.status(400).json({ 
@@ -62,6 +62,7 @@ const createClient = async (req, res) => {
             leadNotificationEmail: leadNotificationEmail || '',
             aiModel: aiModel || 'gpt-4o-mini',
             aiApiKey: aiApiKey || '',
+            channels: channels || { whatsapp: true, discord: false },
             useNaracordQuota: true // Default all new clients to Naracord Managed Quota
         }).save();
 

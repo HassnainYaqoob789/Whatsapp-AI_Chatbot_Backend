@@ -8,9 +8,11 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "axios": "^1.7.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
+    "discord.js": "^14.27.0",
     "dotenv": "^16.4.5",
     "duckduckgo-ai-chat": "^1.0.0",
     "express": "^4.21.0",
