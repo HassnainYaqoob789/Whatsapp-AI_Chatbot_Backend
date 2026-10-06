@@ -147,6 +147,8 @@ const clientSchema = new mongoose.Schema({
     policy: {
       privacyPolicy: { type: String, default: '' },
       terms: { type: String, default: '' },
+      // Compact AI-generated summary of terms/privacy used by the moderation judge (saves tokens per message)
+      digest: { type: String, default: '' },
     },
     // Dynamic rules set by the client: keywords and/or plain-language description (AI judged)
     rules: {
@@ -163,7 +165,15 @@ const clientSchema = new mongoose.Schema({
       dryRun: { type: Boolean, default: true }, // log-only until client turns it off
       bannedWords: { type: [String], default: [] },
       spamLimit: { type: Number, default: 5 }, // msgs per 10s per user
-      aiClassify: { type: Boolean, default: false },
+      aiClassify: { type: Boolean, default: false }, // legacy - superseded by aiMode
+      // off = rules only | smart = layered pipeline (recommended) | strict = every eligible message to GPT
+      aiMode: { type: String, enum: ['off', 'smart', 'strict'], default: 'smart' },
+      // ── Cost & performance controls ──
+      trustedRoleIds: { type: [String], default: [] },   // members with these roles skip AI scans
+      exemptChannelIds: { type: [String], default: [] }, // channels never AI-scanned
+      scanOnlyNewMembers: { type: Boolean, default: false },
+      newMemberDays: { type: Number, default: 7 },
+      aiChecksPerMinute: { type: Number, default: 30 },  // per-guild GPT circuit breaker
       actions: {
         delete: { type: Boolean, default: true },
         warn: { type: Boolean, default: true },

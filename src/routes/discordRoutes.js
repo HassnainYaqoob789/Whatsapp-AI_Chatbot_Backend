@@ -7,8 +7,10 @@ const Client = require('../models/Client');
 const DiscordLog = require('../models/DiscordLog');
 const authMiddleware = require('../middleware/authMiddleware');
 const gateway = require('../discord/gatewayManager');
+const ModerationStats = require('../models/ModerationStats');
 const { invalidateTenant } = require('../discord/messageHandler');
 const { encrypt } = require('../discord/crypto');
+const { generateAIResponse } = require('../services/aiService');
 
 // View Channels + Send Messages + Manage Messages + Read History + Send in Threads + Kick + Ban + Moderate Members(timeout)
 const PERMISSIONS = '1374389611526';
@@ -80,7 +82,17 @@ router.put('/settings', authMiddleware, async (req, res) => {
     const m = b.moderation || {};
     if (typeof m.enabled === 'boolean') set['discord.moderation.enabled'] = m.enabled;
     if (typeof m.dryRun === 'boolean') set['discord.moderation.dryRun'] = m.dryRun;
-    if (typeof m.aiClassify === 'boolean') set['discord.moderation.aiClassify'] = m.aiClassify;
+    if (typeof m.aiMode === 'string') set['discord.moderation.aiMode'] = m.aiMode;
+    // Legacy mapping just in case old UI sends it
+    if (typeof m.aiClassify === 'boolean' && !m.aiMode) set['discord.moderation.aiMode'] = m.aiClassify ? 'smart' : 'off';
+    
+    // Cost optimizations
+    if (Array.isArray(m.trustedRoleIds)) set['discord.moderation.trustedRoleIds'] = m.trustedRoleIds.map(String);
+    if (Array.isArray(m.exemptChannelIds)) set['discord.moderation.exemptChannelIds'] = m.exemptChannelIds.map(String);
+    if (typeof m.scanOnlyNewMembers === 'boolean') set['discord.moderation.scanOnlyNewMembers'] = m.scanOnlyNewMembers;
+    if (Number.isInteger(m.newMemberDays)) set['discord.moderation.newMemberDays'] = Math.max(m.newMemberDays, 1);
+    if (Number.isInteger(m.aiChecksPerMinute)) set['discord.moderation.aiChecksPerMinute'] = Math.max(m.aiChecksPerMinute, 1);
+
     if (Array.isArray(m.bannedWords)) set['discord.moderation.bannedWords'] = m.bannedWords.map(w => String(w).trim()).filter(Boolean).slice(0, 200);
     if (Number.isInteger(m.spamLimit)) set['discord.moderation.spamLimit'] = Math.min(Math.max(m.spamLimit, 2), 30);
     if (m.actions) {
@@ -95,9 +107,16 @@ router.put('/settings', authMiddleware, async (req, res) => {
       if (['none', 'timeout', 'kick', 'ban'].includes(e.action)) set['discord.moderation.escalation.action'] = e.action;
       if (Number.isInteger(e.timeoutMinutes)) set['discord.moderation.escalation.timeoutMinutes'] = Math.min(Math.max(e.timeoutMinutes, 1), 40320);
     }
+    let policyChanged = false;
     if (b.policy) {
-      if (typeof b.policy.privacyPolicy === 'string') set['discord.policy.privacyPolicy'] = b.policy.privacyPolicy.slice(0, 20000);
-      if (typeof b.policy.terms === 'string') set['discord.policy.terms'] = b.policy.terms.slice(0, 20000);
+      if (typeof b.policy.privacyPolicy === 'string') {
+        set['discord.policy.privacyPolicy'] = b.policy.privacyPolicy.slice(0, 20000);
+        policyChanged = true;
+      }
+      if (typeof b.policy.terms === 'string') {
+        set['discord.policy.terms'] = b.policy.terms.slice(0, 20000);
+        policyChanged = true;
+      }
     }
     if (Array.isArray(b.rules)) {
       set['discord.rules'] = b.rules.slice(0, 50).map(r => ({
@@ -108,6 +127,23 @@ router.put('/settings', authMiddleware, async (req, res) => {
       })).filter(r => r.name);
     }
     const client = await Client.findByIdAndUpdate(getClientId(req), { $set: set }, { new: true });
+    
+    // Auto-generate a short policy digest if it changed
+    if (policyChanged && client) {
+      const combined = `${client.discord.policy.terms}\n\n${client.discord.policy.privacyPolicy}`.trim();
+      if (combined.length > 50) {
+        try {
+          const sys = `You are a summarizer. Extract the most important community rules and moderation constraints from the text below. Output exactly as a concise bulleted list (max 10 bullets). Do not include filler text.`;
+          const res = await generateAIResponse(combined.slice(0, 10000), [], sys, client, null, null, { temperature: 0, maxTokens: 400 });
+          client.discord.policy.digest = res.text;
+          await client.save();
+        } catch (e) { console.error('[Discord] failed to generate policy digest', e.message); }
+      } else {
+        client.discord.policy.digest = '';
+        await client.save();
+      }
+    }
+
     if (client?.discord?.guildId) invalidateTenant(client.discord.guildId);
     res.json({ success: true, discord: client.discord, channels: client.channels });
   } catch (e) {
@@ -165,3 +201,55 @@ router.get('/logs', authMiddleware, async (req, res) => {
 });
 
 module.exports = router;
+
+// 9. Moderation Stats
+router.get('/stats', authMiddleware, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 7;
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const dateStr = since.toISOString().split('T')[0];
+
+    const stats = await ModerationStats.find({ 
+      clientId: getClientId(req),
+      date: { $gte: dateStr }
+    });
+
+    let totalSeen = 0, byRules = 0, skipped = 0, cached = 0, modApi = 0, gpt = 0, violations = 0;
+    stats.forEach(s => {
+      totalSeen += s.messagesSeen;
+      byRules += s.decidedByRules;
+      skipped += s.skippedPreFilter;
+      cached += s.cacheHits;
+      modApi += s.moderationApiCalls;
+      gpt += s.gptCalls;
+      violations += s.violations;
+    });
+
+    // Assume average 500 tokens per GPT call, standard API cost
+    const estimatedGptCost = (gpt * 500) / 1000000 * 0.150; // gpt-4o-mini price
+
+    // Without optimizations, everything goes to GPT with a huge prompt (e.g. 2500 tokens)
+    const naiveCost = (totalSeen - byRules) * 2500 / 1000000 * 0.150;
+
+    res.json({
+      success: true,
+      summary: {
+        days,
+        messagesSeen: totalSeen,
+        decidedByRules: byRules,
+        skippedPreFilter: skipped,
+        cacheHits: cached,
+        moderationApiCalls: modApi,
+        gptCalls: gpt,
+        violations,
+        percentHandledFree: totalSeen ? Math.round(((totalSeen - gpt) / totalSeen) * 100) : 100,
+        estimatedGptCost,
+        estimatedSavings: Math.max(0, naiveCost - estimatedGptCost)
+      }
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});

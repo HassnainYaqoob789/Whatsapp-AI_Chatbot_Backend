@@ -5,7 +5,9 @@ const axios = require("axios");
 const FormData = require("form-data");
 
 // Returns: { text: string, tokensUsed: number }
-async function generateAIResponse(userMessage, conversationHistory = [], systemPrompt, client, imageUrl = null, audioUrl = null) {
+// options (optional): { temperature, maxTokens, jsonMode } - used by compact calls such as the Discord moderation judge.
+// Existing callers that omit it keep the exact previous behaviour.
+async function generateAIResponse(userMessage, conversationHistory = [], systemPrompt, client, imageUrl = null, audioUrl = null, options = {}) {
     let aiModel = client.aiModel || "gpt-4o-mini";
     const useManagedQuota = client.useNaracordQuota !== false;
     let aiApiKey = client.aiApiKey;
@@ -57,14 +59,14 @@ async function generateAIResponse(userMessage, conversationHistory = [], systemP
 
     try {
         if (aiModel === "gpt-4o-mini" || aiModel === "gpt-4o") {
-            const result = await callOpenAI(messages, aiModel, aiApiKey);
+            const result = await callOpenAI(messages, aiModel, aiApiKey, options);
             return { text: result.text, tokensUsed: result.usage.total_tokens || 0 };
         } else if (aiModel === "gemini-flash") {
             const geminiReply = await callGeminiAI(userMessage, conversationHistory, systemPrompt, aiApiKey, imageUrl, audioUrl);
             return { text: geminiReply.text, tokensUsed: geminiReply.tokensUsed || 0 };
         } else {
             // Fallback for any unknown models
-            const result = await callOpenAI(messages, "gpt-4o-mini", aiApiKey);
+            const result = await callOpenAI(messages, "gpt-4o-mini", aiApiKey, options);
             return { text: result.text, tokensUsed: result.usage.total_tokens || 0 };
         }
     } catch (error) {
@@ -78,10 +80,15 @@ async function generateAIResponse(userMessage, conversationHistory = [], systemP
 }
 
 // 2. Provider: OpenAI API (GPT-4o / GPT-4o Mini)
-async function callOpenAI(messages, model, apiKey) {
+async function callOpenAI(messages, model, apiKey, options = {}) {
+    const body = { model, messages };
+    if (typeof options.temperature === "number") body.temperature = options.temperature;
+    if (options.maxTokens) body.max_tokens = options.maxTokens;
+    if (options.jsonMode) body.response_format = { type: "json_object" };
+
     const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
-        { model, messages },
+        body,
         {
             headers: {
                 "Content-Type": "application/json",
@@ -216,6 +223,20 @@ async function callGeminiAI(userMessage, conversationHistory, systemPrompt, apiK
     throw new Error("Empty response from Gemini API");
 }
 
+/**
+ * Resolves which OpenAI key a client should use (managed Naracord key or BYOK).
+ * Returns null when no usable key exists. Shared by auxiliary services (e.g. Moderation API).
+ */
+function resolveOpenAIKey(client) {
+    if (client && client.useNaracordQuota === false) {
+        const model = client.aiModel || "gpt-4o-mini";
+        if (model.startsWith("gpt") && client.aiApiKey) return client.aiApiKey;
+        return process.env.OPENAI_API_KEY || null; // BYOK on Gemini - fall back to managed key for free endpoints
+    }
+    return process.env.OPENAI_API_KEY || null;
+}
+
 module.exports = {
-    generateAIResponse
+    generateAIResponse,
+    resolveOpenAIKey
 };

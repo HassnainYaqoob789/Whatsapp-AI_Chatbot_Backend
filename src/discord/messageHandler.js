@@ -4,6 +4,7 @@ const DiscordLog = require('../models/DiscordLog');
 const { evaluate } = require('./moderationEngine');
 const { generateAIResponse } = require('../services/aiService');
 const { checkQuota, deductTokens } = require('../services/quotaService');
+const ModerationStats = require('../models/ModerationStats');
 
 // guildId -> { client, at } (30s cache so we don't hit Mongo for every message)
 const tenantCache = new Map();
@@ -17,6 +18,51 @@ async function getTenant(guildId) {
   return client;
 }
 function invalidateTenant(guildId) { tenantCache.delete(guildId); }
+
+// Buffer for moderation stats to avoid writing to Mongo for every message
+const statsBuffer = new Map(); // key -> stats object
+
+function getStatsKey(clientId, guildId) {
+  const date = new Date().toISOString().split('T')[0];
+  return `${clientId}:${guildId}:${date}`;
+}
+
+function incStats(clientId, guildId, field, amount = 1) {
+  const key = getStatsKey(clientId, guildId);
+  const current = statsBuffer.get(key) || { 
+    clientId, guildId, date: key.split(':')[2], 
+    messagesSeen: 0, decidedByRules: 0, skippedPreFilter: 0, 
+    cacheHits: 0, moderationApiCalls: 0, gptCalls: 0, violations: 0 
+  };
+  current[field] = (current[field] || 0) + amount;
+  statsBuffer.set(key, current);
+}
+
+// Flush stats buffer every 15 seconds
+setInterval(async () => {
+  if (statsBuffer.size === 0) return;
+  const entries = Array.from(statsBuffer.values());
+  statsBuffer.clear();
+  
+  for (const entry of entries) {
+    try {
+      await ModerationStats.findOneAndUpdate(
+        { clientId: entry.clientId, guildId: entry.guildId, date: entry.date },
+        { $inc: { 
+            messagesSeen: entry.messagesSeen, 
+            decidedByRules: entry.decidedByRules,
+            skippedPreFilter: entry.skippedPreFilter,
+            cacheHits: entry.cacheHits,
+            moderationApiCalls: entry.moderationApiCalls,
+            gptCalls: entry.gptCalls,
+            violations: entry.violations
+          } 
+        },
+        { upsert: true }
+      );
+    } catch (e) { console.error('[Discord] failed to flush stats:', e.message); }
+  }
+}, 15000).unref();
 
 // channelId -> last N turns (in-memory conversation memory)
 const memory = new Map();
@@ -128,7 +174,20 @@ async function handleMessage(message, botUser, mode) {
   // ── 1. Moderation ──
   const mod = client.discord.moderation;
   const result = await evaluate(client, message);
+  
+  // Update stats
+  incStats(client._id, message.guild.id, 'messagesSeen');
+  if (result.decidedBy === 'rules') incStats(client._id, message.guild.id, 'decidedByRules');
+  else if (result.decidedBy === 'prefilter') incStats(client._id, message.guild.id, 'skippedPreFilter');
+  else if (result.decidedBy === 'cache') incStats(client._id, message.guild.id, 'cacheHits');
+  else if (result.decidedBy === 'mod_api') incStats(client._id, message.guild.id, 'moderationApiCalls');
+  else if (result.decidedBy === 'gpt') {
+    incStats(client._id, message.guild.id, 'moderationApiCalls'); // GPT implies ModAPI was called
+    incStats(client._id, message.guild.id, 'gptCalls');
+  }
+  
   if (result.action !== 'none') {
+    incStats(client._id, message.guild.id, 'violations');
     await enforce(message, client, result);
     return;
   }
