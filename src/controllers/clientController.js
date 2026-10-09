@@ -221,9 +221,14 @@ const updateMySettings = async (req, res) => {
         }
 
         // ── Dynamic Webhook / External API Integration ──
-        const { externalApiUrl, externalApiKey } = req.body;
+        const { externalApiUrl, externalApiKey, leadCaptureFields } = req.body;
         if (externalApiUrl !== undefined) client.externalApiUrl = externalApiUrl;
         if (externalApiKey !== undefined && externalApiKey !== '') client.externalApiKey = externalApiKey;
+        
+        // ── Dynamic Lead Capture Fields ──
+        if (leadCaptureFields !== undefined && Array.isArray(leadCaptureFields)) {
+            client.leadCaptureFields = leadCaptureFields.filter(f => f.label && f.key);
+        }
 
         await client.save();
 

@@ -560,27 +560,39 @@ const handleIncomingMessage = async (req, res) => {
                             }
 
                             // ═══ AI FALLBACK: No AutoReply matched + Quota OK ═══
-                            const aiResult = await generateAIResponse(combinedMessage, history, systemPrompt, client);
+                            let dynamicSystemPrompt = systemPrompt;
+                            if (client.leadCaptureFields && client.leadCaptureFields.length > 0) {
+                                const fieldNames = client.leadCaptureFields.map(f => f.label).join(", ");
+                                dynamicSystemPrompt += `\n\n═══════════════════════════════\nDYNAMIC LEAD CAPTURE RULE (ALWAYS FOLLOW)\n═══════════════════════════════\nBefore closing a lead or booking, you MUST capture the following details from the user: Name, Email, Company Name, and these custom fields: ${fieldNames}. Once collected, you MUST output this exact JSON format at the very end of your reply (hidden from user):\n[[LEAD_DATA_JSON: { "name": "...", "phone": "...", "email": "...", "companyName": "...", "customFields": { ... } } ]]`;
+                            }
+
+                            const aiResult = await generateAIResponse(combinedMessage, history, dynamicSystemPrompt, client);
                             let aiReply = aiResult.text;
 
-                            // Intercept Lead Data Tag first before caching
-                            const leadMatch = aiReply.match(/\[\[LEAD_DATA:\s*(.*?)\s*\]\]/i);
-                            if (leadMatch) {
-                                const rawData = leadMatch[1];
-                                const parts = rawData.split('|').map(s => s.trim());
-                                // If AI leaves name blank, use the WhatsApp profile name we captured earlier.
-                                const name = (parts[0] && parts[0] !== '') ? parts[0] : (chatDoc?.customerName || 'Unknown');
-                                const phone = (parts[1] && parts[1] !== '') ? parts[1] : fromPhone;
-                                const email = parts[2] || '';
-                                const companyName = parts[3] || '';
-
+                            // ── NEW: JSON Based Dynamic Lead Capture (SaaS) ──
+                            const leadJsonMatch = aiReply.match(/\[\[LEAD_DATA_JSON:\s*(\{.*?\})\s*\]\]/is);
+                            if (leadJsonMatch) {
                                 try {
+                                    const jsonData = JSON.parse(leadJsonMatch[1]);
+                                    const name = jsonData.name || chatDoc?.customerName || 'Unknown';
+                                    const phone = jsonData.phone || fromPhone;
+                                    const email = jsonData.email || '';
+                                    const companyName = jsonData.companyName || '';
+                                    
+                                    let customData = '';
+                                    let customEmailRows = '';
+                                    if (jsonData.customFields && typeof jsonData.customFields === 'object') {
+                                        const customEntries = Object.entries(jsonData.customFields);
+                                        customData = customEntries.map(([k, v]) => `${k}: ${v}`).join(' | ');
+                                        customEmailRows = customEntries.map(([k, v]) => `<tr><td style="background-color: #fff3cd; font-weight: bold; color: #856404; text-transform: capitalize;">${k}</td><td style="background-color: #fff3cd; color: #856404;">${v}</td></tr>`).join('');
+                                    }
+
                                     await Lead.findOneAndUpdate(
                                         { phone, clientId },
-                                        { $set: { name, email, companyName, source: 'WhatsApp AI' }, $setOnInsert: { clientId } },
+                                        { $set: { name, email, companyName, customData, source: 'WhatsApp AI' }, $setOnInsert: { clientId } },
                                         { upsert: true, new: true }
                                     );
-                                    console.log(`[${client.businessName}] Lead saved: ${name} - ${phone} - ${companyName}`);
+                                    console.log(`[${client.businessName}] Lead saved via JSON: ${name} - Custom: ${customData}`);
 
                                     if (leadNotificationEmail) {
                                         const sendEmail = require("../utils/sendEmail");
@@ -604,17 +616,71 @@ const handleIncomingMessage = async (req, res) => {
                                                         <tr><td style="background-color: #f8f9fa; font-weight: bold;">WhatsApp</td><td><a href="https://wa.me/${phone.replace(/[^0-9]/g, '')}">${phone}</a></td></tr>
                                                         <tr><td style="background-color: #f8f9fa; font-weight: bold;">Email</td><td>${email || 'Not Provided'}</td></tr>
                                                         <tr><td style="background-color: #f8f9fa; font-weight: bold;">Company Name</td><td>${companyName || 'Not Provided'}</td></tr>
+                                                        ${customEmailRows}
                                                     </table>
                                                     <br><p style="font-weight: bold;">Action Required: Contact this lead immediately!</p>
                                                 </div>
                                             `
                                         });
                                     }
+                                    aiReply = aiReply.replace(/\[\[LEAD_DATA_JSON:.*?\]\]/gis, '').trim();
                                 } catch (e) {
-                                    console.error('Failed to save lead:', e.message);
+                                    console.error('Failed to parse/save LEAD_DATA_JSON:', e.message);
                                 }
+                            } else {
+                                // ── LEGACY: Pipe-separated Lead Capture (Backward Compatibility for Finsmart) ──
+                                const leadMatch = aiReply.match(/\[\[LEAD_DATA:\s*(.*?)\s*\]\]/i);
+                                if (leadMatch) {
+                                    const rawData = leadMatch[1];
+                                    const parts = rawData.split('|').map(s => s.trim());
+                                    const name = (parts[0] && parts[0] !== '') ? parts[0] : (chatDoc?.customerName || 'Unknown');
+                                    const phone = (parts[1] && parts[1] !== '') ? parts[1] : fromPhone;
+                                    const email = parts[2] || '';
+                                    const companyName = parts[3] || '';
+                                    const customData = parts.slice(4).join(' | ').trim() || '';
 
-                                aiReply = aiReply.replace(/\[\[LEAD_DATA:.*?\]\]/gi, '').trim();
+                                    try {
+                                        await Lead.findOneAndUpdate(
+                                            { phone, clientId },
+                                            { $set: { name, email, companyName, customData, source: 'WhatsApp AI' }, $setOnInsert: { clientId } },
+                                            { upsert: true, new: true }
+                                        );
+                                        console.log(`[${client.businessName}] Lead saved: ${name} - ${phone} - Custom: ${customData}`);
+
+                                        if (leadNotificationEmail) {
+                                            const sendEmail = require("../utils/sendEmail");
+                                            await sendEmail({
+                                                to: leadNotificationEmail,
+                                                subject: `New Lead (${client.businessName}): ${name}`,
+                                                businessName: client.businessName,
+                                                clientSmtp: {
+                                                    host: client.smtpHost,
+                                                    port: client.smtpPort,
+                                                    user: client.smtpUser,
+                                                    password: client.smtpPassword,
+                                                    from: client.smtpFrom,
+                                                },
+                                                html: `
+                                                    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+                                                        <h2 style="color: #0056b3;">🚀 New Lead Captured! (${client.businessName})</h2>
+                                                        <table border="1" cellpadding="10" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 600px;">
+                                                            <tr><td style="background-color: #f8f9fa; font-weight: bold;">Business</td><td>${client.businessName}</td></tr>
+                                                            <tr><td style="background-color: #f8f9fa; font-weight: bold;">Name</td><td>${name}</td></tr>
+                                                            <tr><td style="background-color: #f8f9fa; font-weight: bold;">WhatsApp</td><td><a href="https://wa.me/${phone.replace(/[^0-9]/g, '')}">${phone}</a></td></tr>
+                                                            <tr><td style="background-color: #f8f9fa; font-weight: bold;">Email</td><td>${email || 'Not Provided'}</td></tr>
+                                                            <tr><td style="background-color: #f8f9fa; font-weight: bold;">Company Name</td><td>${companyName || 'Not Provided'}</td></tr>
+                                                            ${customData ? `<tr><td style="background-color: #fff3cd; font-weight: bold; color: #856404;">Custom Requirements</td><td style="background-color: #fff3cd; color: #856404;">${customData}</td></tr>` : ''}
+                                                        </table>
+                                                        <br><p style="font-weight: bold;">Action Required: Contact this lead immediately!</p>
+                                                    </div>
+                                                `
+                                            });
+                                        }
+                                    } catch (e) {
+                                        console.error('Failed to save lead:', e.message);
+                                    }
+                                    aiReply = aiReply.replace(/\[\[LEAD_DATA:.*?\]\]/gi, '').trim();
+                                }
                             }
 
                             // ── UNIVERSAL API/WEBHOOK INTEGRATION (SaaS FEATURE) ──

@@ -120,6 +120,15 @@ const clientSchema = new mongoose.Schema({
     }],
     default: [],  // If empty, uses defaults: Learn More, Pricing & Plans, Talk to Team
   },
+  // ── Dynamic Lead Capture (SaaS) ──
+  leadCaptureFields: {
+    type: [{
+      label: { type: String, required: true },
+      key: { type: String, required: true },
+      required: { type: Boolean, default: false }
+    }],
+    default: [],
+  },
   // ── Universal External Webhook/API (For SaaS Onboarding & Integrations) ──
   externalApiUrl: {
     type: String,

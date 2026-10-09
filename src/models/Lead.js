@@ -29,6 +29,9 @@ const leadSchema = new mongoose.Schema({
   companyName: {
     type: String,
   },
+  customData: {
+    type: String, // Holds dynamic extra data required by SaaS clients
+  },
   source: {
     type: String,
     default: 'WhatsApp AI',
