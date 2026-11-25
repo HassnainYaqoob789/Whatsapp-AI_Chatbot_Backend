@@ -112,7 +112,10 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
-        origin: allowedOrigins,
+        origin: (origin, callback) => {
+            // Allow any origin for SaaS client portals (matches Express CORS behavior)
+            return callback(null, true);
+        },
         methods: ["GET", "POST"],
         credentials: true
     }
